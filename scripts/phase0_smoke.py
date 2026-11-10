@@ -91,8 +91,12 @@ def check_safetune():
     r = subprocess.run([sys.executable, "-m", "training.harden_safetune", "--method", "safegrad",
                         "--max-rows", "4", "--epochs", "0.5", "--batch-size", "1", "--safety-n", "8",
                         "--out", "runs/phase0_safetune"], capture_output=True, text=True)
+    (OUT / "safetune.stdout.log").write_text(r.stdout[-20000:])
+    (OUT / "safetune.stderr.log").write_text(r.stderr[-20000:])
     if r.returncode:
-        raise RuntimeError((r.stdout[-600:] + "\n" + r.stderr[-1500:]))
+        tb = r.stderr[r.stderr.rfind("Traceback"):] if "Traceback" in r.stderr else ""
+        hint = " (negative code = killed by a signal; -9 is usually the out-of-memory killer)" if r.returncode < 0 else ""
+        raise RuntimeError(f"exit code {r.returncode}{hint}\n{tb[-2500:] or r.stderr[-600:]}")
     run = json.loads(Path("runs/phase0_safetune/run.json").read_text())
     return {"train_loss": run["train_loss"], "wall_seconds": run["wall_seconds"], "versions": run["versions"],
             "safety_set": run["safety_set"], "adapter_saved": Path("runs/phase0_safetune/adapter/adapter_config.json").exists()}
