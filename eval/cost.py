@@ -1,7 +1,7 @@
 """Cost of the open-weights guard versus a closed-model API guard. Every assumption is an
 explicit argument and is written into the output, because none of the prices are ours.
 
-Measured inputs come from reports/run_meta.json (tokens/second on the GPU we actually used)
+Measured inputs come from reports/run_meta_*.json (tokens/second on the GPU we actually used)
 and the guard traces (prompt size, decisions). Prices are ASSUMPTIONS you must set to the
 current public list prices before quoting the result.
 
@@ -27,7 +27,8 @@ def main():
     ap.add_argument("--utilisation", type=float, default=0.5, help="ASSUMPTION: fraction of GPU time doing useful work")
     a = ap.parse_args()
     rep = Path(a.reports)
-    meta = json.loads((rep / "run_meta.json").read_text()) if (rep / "run_meta.json").exists() else {}
+    metas = [json.loads(f.read_text()) for f in sorted(rep.glob("run_meta*.json"))]
+    meta = next((m for m in metas if (m.get("tokens_per_second") or {}).get("guard")), metas[0] if metas else {})
     tps = (meta.get("tokens_per_second") or {}).get("guard")
     prompt_tokens = a.prompt_tokens
     if prompt_tokens is None and Path("data/sft/guard_val.jsonl").exists():
@@ -50,7 +51,7 @@ def main():
                                     "usd_per_check": gpus * 24 * a.gpu_hourly / a.requests_per_day}
         out["ratio_api_over_self_hosted"] = out["api_guard"]["usd_per_day"] / out["self_hosted_guard"]["usd_per_day"]
     else:
-        out["self_hosted_guard"] = "not computed: no measured guard throughput in run_meta.json yet"
+        out["self_hosted_guard"] = "not computed: no measured guard throughput in run_meta*.json yet"
     out["caveats"] = ["Unbatched single-stream throughput; batching or vLLM would lower self-hosted cost.",
                       "Ignores engineering, on-call and idle capacity beyond the utilisation factor.",
                       "A closed API guard may be more or less accurate; this compares cost only."]

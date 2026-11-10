@@ -13,54 +13,64 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+SMOKE = "for c in transformers auditkit curatorkit safetune circuitkit; do python scripts/phase0_smoke.py $c | tail -60; done; true"
+HAND = "python -m testbed.runner --scenarios data/seed/handwritten.jsonl --out runs/hand/base_seed.jsonl --config-name base && python -m eval.metrics --traces runs/hand/base_seed.jsonl --out runs/hand/metrics"
+
+# stage -> lanes. Each lane is a list of commands run in order on its own GPU (lane index = GPU index).
 STAGES = {
-    "smoke": ["for c in transformers auditkit curatorkit safetune circuitkit; do python scripts/phase0_smoke.py $c | tail -45; done; true"],
+    "smoke": [[HAND], [SMOKE]],
     "baseline": [
-        "python -m eval.run_all --only base base_boundary",
-        "python -m eval.run_all --only base_sampled --splits test",
-        "python -m eval.run_all --only base --splits train --runs runs/train --reports runs/train_reports",
-        "python -m eval.capability --out reports/capability_base",
+        [HAND,
+         "python -m eval.run_all --only base base_boundary --reports reports",
+         "python -m eval.run_all --only base_sampled --splits test --reports runs/sampled_reports"],
+        [SMOKE,
+         "python -m eval.run_all --only base --splits train --runs runs/train --reports runs/train_reports",
+         "python -m eval.capability --out reports/capability_base"],
     ],
     "train": [
-        "python -m training.build_sft",
-        "python -m training.guard_data --traces runs/train/base_train.jsonl",
-        "python -m training.harden_safetune --method safegrad --out outputs/hardened-safegrad --epochs 2",
-        "python scripts/hub_sync.py push --user {hf_user}",
-        "python -m training.harden_safetune --method plain --data data/sft/guard_train.jsonl --val data/sft/guard_val.jsonl --out outputs/guard --epochs 2",
-        "python scripts/hub_sync.py push --user {hf_user}",
-        "python -m training.harden_safetune --method plain --out outputs/hardened-plain --epochs 2",
+        ["python -m training.build_sft",
+         "python -m training.harden_safetune --method safegrad --out outputs/hardened-safegrad --epochs 2",
+         "python -m training.harden_safetune --method plain --out outputs/hardened-plain --epochs 2"],
+        ["python -m training.guard_data --traces runs/train/base_train.jsonl",
+         "python -m training.harden_safetune --method plain --data data/sft/guard_train.jsonl --val data/sft/guard_val.jsonl --out outputs/guard --epochs 2"],
     ],
     "final": [
-        "python -m eval.run_all --agent-adapter outputs/hardened-safegrad/adapter --guard-adapter outputs/guard/adapter --plain-adapter outputs/hardened-plain/adapter --no-sampled",
-        "python scripts/hub_sync.py push --user {hf_user}",
-        "python -m eval.run_all --agent-adapter outputs/hardened-safegrad/adapter --only base_sampled hardened_sampled --splits test",
-        "python -m eval.capability --out reports/capability --adapter hardened=outputs/hardened-safegrad/adapter --adapter plain_sft=outputs/hardened-plain/adapter",
-        "python -m eval.report --reports reports",
+        ["python -m eval.run_all --agent-adapter outputs/hardened-safegrad/adapter --guard-adapter outputs/guard/adapter --plain-adapter outputs/hardened-plain/adapter --no-sampled --splits test --reports reports",
+         "python -m eval.run_all --agent-adapter outputs/hardened-safegrad/adapter --only hardened_sampled --splits test --reports runs/sampled_reports"],
+        ["python -m eval.run_all --agent-adapter outputs/hardened-safegrad/adapter --guard-adapter outputs/guard/adapter --plain-adapter outputs/hardened-plain/adapter --no-sampled --splits heldout_format --reports reports",
+         "python -m eval.capability --out reports/capability --adapter hardened=outputs/hardened-safegrad/adapter --adapter plain_sft=outputs/hardened-plain/adapter"],
     ],
     "interp": [
-        "python -m interp.circuitkit_discover --n 24 --algorithm eap-ig --out reports/interp || echo 'CircuitKIT discovery failed; causal_eval falls back to probe-selected layers'",
-        "python -m interp.causal_eval --limit 120 --out reports/interp",
+        ["python -m interp.circuitkit_discover --n 24 --algorithm eap-ig --out reports/interp || echo 'CircuitKIT discovery failed; causal_eval falls back to probe-selected layers'",
+         "python -m interp.causal_eval --limit 120 --out reports/interp"],
     ],
 }
 
-JOB = r'''
-import json, os, subprocess, sys, time
-STAGE, COMMANDS, HF_USER, COMMIT, KAGGLE_USER = {stage!r}, {commands!r}, {hf_user!r}, {commit!r}, {kaggle_user!r}
+JOB = r"""
+import json, os, subprocess, sys, threading, time
+STAGE, LANES, HF_USER, COMMIT = {stage!r}, {lanes!r}, {hf_user!r}, {commit!r}
 
-def sh(cmd, check=False):
+def sh(cmd, check=False, env=None, log=None):
     print("\n$", cmd, flush=True)
     t0 = time.time()
-    r = subprocess.run(cmd, shell=True)
-    print(f"[exit {{r.returncode}} in {{time.time() - t0:.0f}}s]", flush=True)
+    if log:
+        with open(log, "a") as f:
+            f.write(f"\n$ {{cmd}}\n"); f.flush()
+            r = subprocess.run(cmd, shell=True, env=env, stdout=f, stderr=subprocess.STDOUT)
+            f.write(f"[exit {{r.returncode}} in {{time.time() - t0:.0f}}s]\n")
+    else:
+        r = subprocess.run(cmd, shell=True, env=env)
+    print(f"[exit {{r.returncode}} in {{time.time() - t0:.0f}}s] {{cmd[:80]}}", flush=True)
     if check and r.returncode:
         sys.exit(r.returncode)
     return r.returncode
 
 token = None
-p = f"/kaggle/input/intentlock-secrets/hf_token.txt"
-if os.path.exists(p):
-    token = open(p).read().strip()
-else:
+if os.path.exists("/kaggle/input"):
+    for root, _, files in os.walk("/kaggle/input"):
+        if "hf_token.txt" in files:
+            token = open(os.path.join(root, "hf_token.txt")).read().strip()
+if not token:
     try:
         from kaggle_secrets import UserSecretsClient
         token = UserSecretsClient().get_secret("HF_TOKEN")
@@ -75,17 +85,33 @@ os.chdir("/kaggle/working")
 sh("rm -rf intentlock && git clone -q https://github.com/davieslennox0/intentlock.git", check=True)
 os.chdir("intentlock")
 sh(f"git checkout -q {{COMMIT}} && git log --oneline -1", check=True)
-sh("pip uninstall -y -q torchao; pip install -q -r requirements.txt 2>&1 | tail -4; pip check 2>&1 | head -15")
+os.makedirs("runs/logs", exist_ok=True)
+sh("pip uninstall -y -q torchao; pip install -q -r requirements.txt > runs/logs/pip_install.log 2>&1; tail -5 runs/logs/pip_install.log; pip check 2>&1 | head -15; pip freeze > runs/logs/pip_freeze.txt")
 sh(f"python scripts/hub_sync.py pull --user {{HF_USER}}")
-failed = []
-for cmd in COMMANDS:
-    if sh(cmd):
-        failed.append(cmd)
-    sh(f"python scripts/hub_sync.py push --user {{HF_USER}} | tail -1")
+
+lock, failed, stop = threading.Lock(), [], threading.Event()
+def push():
+    with lock:
+        subprocess.run(f"python scripts/hub_sync.py push --user {{HF_USER}} 2>&1 | tail -1", shell=True)
+def heartbeat():
+    while not stop.wait(420):
+        push()
+def lane(i, cmds):
+    env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(i))
+    for cmd in cmds:
+        if sh(cmd, env=env, log=f"runs/logs/{{STAGE}}_lane{{i}}.log"):
+            failed.append(cmd)
+        push()
+threads = [threading.Thread(target=lane, args=(i, c)) for i, c in enumerate(LANES)]
+hb = threading.Thread(target=heartbeat, daemon=True); hb.start()
+[t.start() for t in threads]; [t.join() for t in threads]
+stop.set(); push()
 print("\nSTAGE", STAGE, "finished. failed commands:", json.dumps(failed, indent=1))
-sh("rm -rf /kaggle/working/intentlock/outputs/*/trainer; cd /kaggle/working && tar czf intentlock_reports.tgz intentlock/reports intentlock/runs 2>/dev/null; rm -rf intentlock")
+for i in range(len(LANES)):
+    sh(f"tail -40 runs/logs/{{STAGE}}_lane{{i}}.log")
+sh("cd /kaggle/working && tar czf intentlock_out.tgz intentlock/reports intentlock/runs 2>/dev/null; rm -rf intentlock")
 sys.exit(1 if failed else 0)
-'''
+"""
 
 
 def main():
@@ -97,8 +123,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     commit = a.commit or subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    cmds = [c.format(hf_user=a.hf_user) for c in STAGES[a.stage]]
-    code = JOB.format(stage=a.stage, commands=cmds, hf_user=a.hf_user, commit=commit, kaggle_user=a.kaggle_user)
+    code = JOB.format(stage=a.stage, lanes=STAGES[a.stage], hf_user=a.hf_user, commit=commit)
     meta = {"id": f"{a.kaggle_user}/intentlock-{a.stage}", "title": f"intentlock-{a.stage}", "code_file": "job.py",
             "language": "python", "kernel_type": "script", "is_private": True, "enable_gpu": True,
             "enable_internet": True, "dataset_sources": [f"{a.kaggle_user}/intentlock-secrets"],
@@ -109,7 +134,7 @@ def main():
     compile(code, "job.py", "exec")
     print(f"stage={a.stage} commit={commit[:8]} dir={d}")
     if a.dry_run:
-        print(code[:1500])
+        print(code[-1700:])
         return
     subprocess.run(["kaggle", "kernels", "push", "-p", str(d)], check=True)
 

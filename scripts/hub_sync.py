@@ -26,7 +26,7 @@ def main():
         for d in ("runs", "reports"):
             if Path(d).exists():
                 api.upload_folder(folder_path=d, path_in_repo=d, repo_id=store, repo_type="dataset",
-                                  commit_message=f"sync {d}", ignore_patterns=["*.pt", "**/trainer/**", "phase0_*/**"])
+                                  commit_message=f"sync {d}", ignore_patterns=["*.pt", "*.safetensors", "**/trainer/**", "phase0_*/**"])
         for out, name in ADAPTERS.items():
             for f in ("training_log.json", "run.json", "training_curve.png"):
                 if (Path(out) / f).exists():

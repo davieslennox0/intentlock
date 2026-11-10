@@ -111,7 +111,9 @@ def main():
             "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu",
             "versions": {"torch": torch.__version__, "transformers": transformers.__version__,
                          "python": platform.python_version()}}
-    (Path(a.reports) / "run_meta.json").write_text(json.dumps(meta, indent=2, default=str))
+    # one file per invocation: parallel runs on separate GPUs must not overwrite each other
+    tag = "_".join(a.splits) + ("_" + "_".join(a.only) if a.only else "")
+    (Path(a.reports) / f"run_meta_{tag}.json").write_text(json.dumps(meta, indent=2, default=str))
 
 
 if __name__ == "__main__":

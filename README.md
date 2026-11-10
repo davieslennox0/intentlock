@@ -218,7 +218,7 @@ python scripts/publish_hf.py --user Sykeclonex
 
 The same steps as Colab notebooks: `notebooks/00` to `03`. Seeds: data 7, training 7, evaluation 0
 (greedy) and 1 (sampled, T=0.7). Every run writes its arguments, library versions and hardware next
-to its outputs (`*.meta.json`, `run.json`, `reports/run_meta.json`).
+to its outputs (`*.meta.json`, `run.json`, `reports/run_meta_*.json`).
 
 **CI.** `tests` runs the unit tests and checks the dataset regenerates byte-for-byte. `tiny-aya`
 (manual) runs the Phase 0 checks or a sharded base-agent run on GitHub's CPU runners; it needs an
