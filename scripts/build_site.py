@@ -69,7 +69,17 @@ def main():
             results[split] = {c: {m: merged[c].get(m) for m in METRICS} | {
                 "asr_by_family": merged[c].get("asr_by_family"), "n_attack": merged[c].get("n_attack"),
                 "n_clean": merged[c].get("n_clean"), "guard": merged[c].get("guard")} for c in CONFIGS if c in merged}
+    rep = json.loads((ROOT / "data/curated/curation_report.json").read_text())
+    fam = {}
+    for k, v in rep["by_family_split"].items():
+        f, sp = k.split("/")
+        fam.setdefault(f, {})[sp] = v
+    dataset = {"attack": rep["final_attack"], "clean": rep["final_clean"], "raw": rep["raw"],
+               "after_curatorkit": rep["after_curatorkit"], "families": fam,
+               "techniques": {k: v for k, v in rep["by_technique"].items() if k != "none"},
+               "splits": {sp: sum(v.get(sp, 0) for v in fam.values()) for sp in ("train", "test", "heldout_format")}}
     data = {
+        "dataset": dataset,
         "generated": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()),
         "runs": {"baseline": a.baseline_run, "final": a.final_run},
         "examples": [{k: e.get(k) for k in ("id", "family", "split", "user_task", "tool_fixtures", "injection_location",

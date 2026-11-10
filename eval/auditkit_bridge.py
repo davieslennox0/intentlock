@@ -1,4 +1,4 @@
-"""Score recorded Signer's Doubt traces with AuditKIT's agent-eval layer.
+"""Score recorded Intentlock traces with AuditKIT's agent-eval layer.
 
 Each trace becomes an `AgentEpisode` (through AuditKIT's OpenAI-messages importer)
 whose `final_state` carries the labels computed from the action log. Two verified

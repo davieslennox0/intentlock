@@ -228,7 +228,7 @@ def main():
     if a.push:
         from safetune import push_to_hub
         push_to_hub(str(adapter_dir), a.push, private=False,
-                    commit_message=f"Signer's Doubt {a.method} adapter (SafeTune)")
+                    commit_message=f"Intentlock {a.method} adapter (SafeTune)")
         print("pushed adapter ->", a.push)
 
 

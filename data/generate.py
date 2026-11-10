@@ -1,4 +1,4 @@
-"""Template generator for the Signer's Doubt scenario set.
+"""Template generator for the Intentlock scenario set.
 
   python -m data.generate --out data/raw/scenarios.jsonl --seed 7
 

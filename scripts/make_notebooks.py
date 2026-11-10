@@ -87,7 +87,7 @@ def cell(kind, src):
 
 out = Path(__file__).resolve().parents[1] / "notebooks"
 for name, (title, cells) in NOTEBOOKS.items():
-    nb = {"cells": [cell("md", f"# Signer's Doubt: {title}")] + [cell(k, s) for k, s in SETUP + cells],
+    nb = {"cells": [cell("md", f"# Intentlock: {title}")] + [cell(k, s) for k, s in SETUP + cells],
           "metadata": {"accelerator": "GPU", "colab": {"gpuType": "T4", "provenance": []},
                        "kernelspec": {"display_name": "Python 3", "name": "python3"}, "language_info": {"name": "python"}},
           "nbformat": 4, "nbformat_minor": 5}

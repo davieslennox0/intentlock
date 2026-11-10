@@ -1,9 +1,9 @@
-# Signer's Doubt: abstract (draft)
+# Intentlock: abstract (draft)
 
 <!-- Draft. Every [bracketed] value is filled from reports/ after the runs; do not submit with brackets. -->
 <!-- TODO(author): confirm and cite the incident in the first sentence. -->
 
-**Signer's Doubt: red-teaming and hardening wallet agents against the Binance kill chain**
+**Intentlock: red-teaming and hardening wallet agents against the Binance kill chain**
 
 The Binance hack began with a poisoned coding assignment and ended with a signing system that
 approved what it was asked to approve. Autonomous wallet agents compress that chain into one model:

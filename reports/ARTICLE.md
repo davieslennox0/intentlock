@@ -1,4 +1,4 @@
-# Signer's Doubt: can a wallet agent be talked into signing?
+# Intentlock: can a wallet agent be talked into signing?
 
 <!-- Draft of the Hugging Face Article. Sections marked PENDING are filled from reports/ after the runs.
      TODO(author): cite a source for the incident in the first paragraph, and confirm its details. -->

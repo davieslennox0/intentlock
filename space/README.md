@@ -1,5 +1,5 @@
 ---
-title: Signer's Doubt
+title: Intentlock
 emoji: 🖋️
 colorFrom: indigo
 colorTo: green
@@ -10,7 +10,7 @@ license: cc-by-nc-4.0
 short_description: Base vs hardened wallet agent on poisoned tool output
 ---
 
-Side-by-side demo for [Signer's Doubt](https://github.com/davieslennox0/intentlock): the same
+Side-by-side demo for [Intentlock](https://github.com/davieslennox0/intentlock): the same
 poisoned tool output is given to base Tiny Aya and to the SafeTune-hardened agent with a pre-signing
 guard. All tools are mocks; nothing is signed, sent or executed.
 

@@ -1,4 +1,4 @@
-# Signer's Doubt
+# Intentlock
 
 **Red-teaming and hardening wallet agents against the Binance kill chain.**
 Lexsi AI Safety and Alignment Hackathon, Track 2 (AI Red Teaming, Safety and Alignment).

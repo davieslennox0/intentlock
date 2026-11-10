@@ -1,7 +1,7 @@
 ---
 license: cc-by-4.0
 language: [en]
-pretty_name: "Signer's Doubt: indirect prompt injection scenarios for wallet agents"
+pretty_name: "Intentlock: indirect prompt injection scenarios for wallet agents"
 task_categories: [text-generation]
 tags: [prompt-injection, ai-safety, red-teaming, agents, tool-use, web3, synthetic]
 size_categories: [1K<n<10K]
@@ -13,7 +13,7 @@ configs:
       - {split: heldout_format, path: heldout_format.jsonl}
 ---
 
-# Signer's Doubt scenarios
+# Intentlock scenarios
 
 1,099 synthetic episodes for testing whether a tool-using wallet agent follows instructions that
 arrive inside tool output (token metadata, marketplace listings, API JSON, READMEs, other agents'

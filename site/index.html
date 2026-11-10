@@ -3,95 +3,318 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Signer's Doubt</title>
-<meta name="description" content="Can a wallet agent be talked into signing? Base vs hardened Tiny Aya on poisoned tool output.">
+<title>Intentlock</title>
+<meta name="description" content="Intentlock: a wallet agent should sign what its user intends, and nothing a token description tells it to.">
 <style>
 :root{
-  --bg:#f6f5f1; --panel:#ffffff; --ink:#1c1b19; --muted:#6a675f; --line:#dedbd2; --accent:#0b5cad;
-  --bad:#b3261e; --bad-bg:#fbe9e7; --ok:#1b6e3a; --ok-bg:#e6f4ea; --warn:#8a5a00; --warn-bg:#fdf1d7;
-  --code:#f0eee8; --inj:#ffe2a8;
+  --bg:#f5f3ee; --panel:#ffffff; --ink:#191a1f; --muted:#62646d; --line:#dcd9d0; --accent:#1f5fbf;
+  --night:#0e1117; --night-2:#161b24; --night-ink:#eef0f4; --night-muted:#9aa3b2; --night-line:#2a3140;
+  --inject:#e09a1a; --inject-bg:#fdecc4; --bad:#c2352c; --bad-bg:#fbe7e4; --ok:#1c7a43; --ok-bg:#e3f3e8;
+  --code:#efede6; --series:#2a78d6; --grid:#e6e3da;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#15161a; --panel:#1e2026; --ink:#ecebe7; --muted:#a09d95; --line:#33353d; --accent:#7db6f5;
-    --bad:#ff8a80; --bad-bg:#3a1d1b; --ok:#7fd69b; --ok-bg:#16301f; --warn:#f2c46b; --warn-bg:#3a2e12;
-    --code:#17181d; --inj:#5a4310;
+    --bg:#12141a; --panel:#1a1e27; --ink:#eceef2; --muted:#9aa1ae; --line:#2c3240; --accent:#7fb2f5;
+    --inject:#f0b545; --inject-bg:#4a3a12; --bad:#ff8f86; --bad-bg:#3b1c1a; --ok:#7dd69c; --ok-bg:#15301f;
+    --code:#141820; --series:#3987e5; --grid:#262c38;
   }
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-main{max-width:1120px;margin:0 auto;padding:28px 16px 64px}
-h1{font-size:2rem;line-height:1.15;margin:0 0 6px;letter-spacing:-.01em}
-h2{font-size:1.2rem;margin:36px 0 10px}
-h3{font-size:1rem;margin:0 0 8px}
-p{margin:0 0 12px}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 a{color:var(--accent)}
-.lede{font-size:1.1rem;max-width:62ch}
-.muted{color:var(--muted)}
-.small{font-size:.875rem}
-.note{border-left:3px solid var(--line);padding:6px 12px;margin:14px 0;color:var(--muted);max-width:75ch}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
-.chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 16px}
-.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-size:.875rem;cursor:pointer}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+section{padding:72px 0}
+h1,h2{font-family:var(--serif);font-weight:600;letter-spacing:-.01em;margin:0}
+h1{font-size:clamp(2.6rem,7vw,4.6rem);line-height:1.02}
+h2{font-size:clamp(1.7rem,3.6vw,2.4rem);line-height:1.15;max-width:22ch}
+h3{font-size:1rem;margin:0 0 8px}
+p{margin:0 0 14px;max-width:66ch}
+.kicker{font:600 .78rem/1 system-ui;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.lede{font-size:1.2rem;color:var(--muted);max-width:56ch;margin-top:18px}
+.muted{color:var(--muted)} .small{font-size:.875rem}
+code,pre{font-family:var(--mono);font-size:13px}
+code{background:var(--code);padding:1px 5px;border-radius:4px;word-break:break-word}
+pre{background:var(--code);border-radius:8px;padding:10px 12px;white-space:pre-wrap;word-break:break-word;margin:6px 0 10px;line-height:1.5}
+mark{background:var(--inject-bg);color:inherit;border-radius:3px;padding:0 2px;box-shadow:inset 0 -2px 0 var(--inject)}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* nav */
+nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--night) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--night-line)}
+nav .wrap{display:flex;align-items:center;gap:22px;height:52px}
+nav .brand{font-family:var(--serif);font-weight:600;font-size:1.1rem;color:var(--night-ink);text-decoration:none;margin-right:auto}
+nav a.l{color:var(--night-muted);text-decoration:none;font-size:.875rem}
+nav a.l:hover{color:var(--night-ink)}
+@media (max-width:720px){nav a.l{display:none}}
+
+/* hero */
+.hero{background:radial-gradient(1200px 500px at 70% -10%,#1d2940 0%,var(--night) 60%);color:var(--night-ink);padding:84px 0 64px}
+.hero .lede{color:var(--night-muted)}
+.hero .kicker{color:var(--inject)}
+.chain{margin-top:44px;display:grid;gap:18px}
+.lane{background:var(--night-2);border:1px solid var(--night-line);border-radius:12px;padding:14px 16px 10px}
+.lane h3{color:var(--night-muted);font-weight:500;font-size:.85rem;margin-bottom:2px}
+.lane svg{width:100%;height:auto;display:block;min-width:600px}
+.lane .scroll{overflow-x:auto}
+.node rect{fill:#1b2230;stroke:#36405a;stroke-width:1.2}
+.node text{fill:var(--night-ink);font:500 13px system-ui;text-anchor:middle}
+.node .sub{fill:var(--night-muted);font-size:10.5px;font-weight:400}
+.wire{stroke:#36405a;stroke-width:1.5;fill:none}
+.packet{fill:var(--inject)}
+.lane.a .packet{animation:run-a 6s linear infinite}
+.lane.b .packet{animation:run-b 6s linear infinite}
+.lane.a .signer rect{animation:flash-bad 6s linear infinite}
+.lane.b .guard rect{animation:flash-ok 6s linear infinite}
+.lane .verdict{font:600 12px system-ui;opacity:0}
+.lane.a .verdict{fill:#ff8f86;animation:show-late 6s linear infinite}
+.lane.b .verdict{fill:#7dd69c;animation:show-mid 6s linear infinite}
+@keyframes run-a{0%{transform:translateX(0);opacity:0}6%{opacity:1}68%{transform:translateX(622px);opacity:1}74%,100%{transform:translateX(622px);opacity:0}}
+@keyframes run-b{0%{transform:translateX(0);opacity:0}6%{opacity:1}46%{transform:translateX(419px);opacity:1}52%,100%{transform:translateX(419px);opacity:0}}
+@keyframes flash-bad{0%,66%{stroke:#36405a;fill:#1b2230}72%,92%{stroke:#ff8f86;fill:#3b1c1a}100%{stroke:#36405a;fill:#1b2230}}
+@keyframes flash-ok{0%,44%{stroke:#36405a;fill:#1b2230}50%,92%{stroke:#7dd69c;fill:#15301f}100%{stroke:#36405a;fill:#1b2230}}
+@keyframes show-late{0%,68%{opacity:0}74%,92%{opacity:1}100%{opacity:0}}
+@keyframes show-mid{0%,46%{opacity:0}52%,92%{opacity:1}100%{opacity:0}}
+
+/* reveal on scroll */
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+.reveal.in{opacity:1;transform:none}
+
+/* kill chain compression */
+.steps4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:28px 0 10px}
+.steps4 .s{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;transition:transform .9s cubic-bezier(.2,.7,.2,1),opacity .9s}
+.steps4 .s b{display:block;font-size:.8rem;color:var(--muted);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+.compress{display:grid;grid-template-columns:1fr;place-items:center;margin-top:18px}
+.onebox{background:var(--night);color:var(--night-ink);border-radius:12px;padding:18px 22px;max-width:560px;width:100%;text-align:center;transform:scale(.92);opacity:0;transition:transform .8s .5s cubic-bezier(.2,.7,.2,1),opacity .8s .5s}
+.onebox small{display:block;color:var(--night-muted);margin-top:4px}
+.kc.in .steps4 .s:nth-child(1){transform:translateX(18%)} .kc.in .steps4 .s:nth-child(2){transform:translateX(6%)}
+.kc.in .steps4 .s:nth-child(3){transform:translateX(-6%)} .kc.in .steps4 .s:nth-child(4){transform:translateX(-18%)}
+.kc.in .onebox{transform:none;opacity:1}
+@media (max-width:760px){.steps4{grid-template-columns:1fr 1fr}.kc.in .steps4 .s{transform:none!important}}
+
+/* player */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:6px 13px;font-size:.875rem}
 .chip[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-.chip:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.tag{display:inline-block;font-size:.75rem;border-radius:4px;padding:1px 6px;background:var(--code);color:var(--muted);margin-right:4px}
-pre{background:var(--code);border-radius:8px;padding:10px 12px;overflow-x:auto;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;margin:6px 0 12px}
-code{font:13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--code);padding:1px 4px;border-radius:4px;word-break:break-word}
-mark{background:var(--inj);color:inherit;border-radius:3px;padding:0 1px}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media (max-width:760px){.cols{grid-template-columns:1fr}}
-.verdict{display:inline-block;border-radius:6px;padding:4px 10px;font-weight:600;font-size:.9rem;margin-bottom:10px}
-.v-bad{background:var(--bad-bg);color:var(--bad)} .v-ok{background:var(--ok-bg);color:var(--ok)} .v-warn{background:var(--warn-bg);color:var(--warn)}
-ol.steps{margin:0;padding-left:20px} ol.steps li{margin-bottom:10px}
-.payload{border-left:3px solid var(--line);padding-left:10px;margin-top:4px}
-.payload.bad{border-color:var(--bad)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+.tag{display:inline-block;font-size:.74rem;border-radius:4px;padding:2px 7px;background:var(--code);color:var(--muted);margin:0 4px 4px 0}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+@media (max-width:820px){.cols{grid-template-columns:1fr}}
+.playbar{display:flex;align-items:center;gap:12px;margin-top:16px}
+.btn{background:var(--ink);color:var(--bg);border:0;border-radius:8px;padding:8px 16px;font-weight:600}
+.beat{opacity:0;transform:translateY(8px);transition:opacity .35s ease,transform .35s ease;margin-bottom:12px;padding-left:14px;border-left:2px solid var(--line)}
+.beat.in{opacity:1;transform:none}
+.beat .who{font:600 .72rem system-ui;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.beat.sign{border-left-color:var(--muted)} .beat.sign.bad{border-left-color:var(--bad)} .beat.sign.blocked{border-left-color:var(--ok)}
+.badge{display:inline-block;border-radius:6px;padding:4px 10px;font-weight:600;font-size:.9rem}
+.b-bad{background:var(--bad-bg);color:var(--bad)} .b-ok{background:var(--ok-bg);color:var(--ok)} .b-warn{background:var(--inject-bg);color:var(--ink)}
+.pending{color:var(--muted);border:1px dashed var(--line);border-radius:10px;padding:16px}
+
+/* numbers */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:26px 0}
+@media (max-width:820px){.stats{grid-template-columns:1fr 1fr}}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.stat .n{font:600 2.1rem/1.1 var(--serif);font-variant-numeric:tabular-nums}
+.stat .l{color:var(--muted);font-size:.875rem;margin-top:4px}
+.fam{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media (max-width:820px){.fam{grid-template-columns:1fr 1fr}}
+.fam .panel b{display:block;margin-bottom:4px}
+
+/* chart */
+.chart{margin-top:18px}
+.chart .row{display:grid;grid-template-columns:190px 1fr 150px;align-items:center;gap:12px;padding:7px 0;position:relative}
+@media (max-width:640px){.chart .row{grid-template-columns:120px 1fr 96px}}
+.chart .name{font-size:.9rem}
+.chart .track{position:relative;height:22px;border-left:1px solid var(--grid);background:linear-gradient(to right,var(--grid) 1px,transparent 1px) 0 0/25% 100%}
+.chart .bar{position:absolute;left:0;top:2px;height:18px;width:0;background:var(--series);border-radius:0 4px 4px 0;transition:width 1s cubic-bezier(.2,.7,.2,1)}
+.chart .ci{position:absolute;top:10px;height:2px;background:var(--ink);opacity:.75}
+.chart .ci::before,.chart .ci::after{content:"";position:absolute;top:-4px;width:2px;height:10px;background:var(--ink)}
+.chart .ci::before{left:0}.chart .ci::after{right:0}
+.chart .val{font-variant-numeric:tabular-nums;font-size:.9rem}
+.chart .val span{color:var(--muted);font-size:.78rem;margin-left:6px}
+.chart .axis{display:grid;grid-template-columns:190px 1fr 150px;gap:12px;color:var(--muted);font-size:.75rem}
+@media (max-width:640px){.chart .axis{grid-template-columns:120px 1fr 96px}}
+.chart .axis div:nth-child(2){display:flex;justify-content:space-between}
+.tip{position:fixed;z-index:20;pointer-events:none;background:var(--night);color:var(--night-ink);border-radius:8px;padding:8px 10px;font-size:.8rem;max-width:260px;opacity:0;transition:opacity .12s}
+
+/* pipeline */
+.pipe{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:26px 0}
+.pipe .p{flex:1 1 150px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;position:relative;margin:0 22px 14px 0;opacity:0;transform:translateX(-14px);transition:opacity .5s,transform .5s}
+.pipe .p b{display:block}
+.pipe .p::after{content:"";position:absolute;right:-18px;top:50%;width:12px;height:2px;background:var(--muted)}
+.pipe .p:last-child::after{display:none}
+.pipe.in .p{opacity:1;transform:none}
+.pipe.in .p:nth-child(2){transition-delay:.15s}.pipe.in .p:nth-child(3){transition-delay:.3s}.pipe.in .p:nth-child(4){transition-delay:.45s}.pipe.in .p:nth-child(5){transition-delay:.6s}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:820px){.two{grid-template-columns:1fr}}
+
+/* table */
+.tabs{display:flex;gap:8px;margin:14px 0}
 .tablewrap{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:.9rem;font-variant-numeric:tabular-nums}
-th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
-th{font-weight:600;color:var(--muted)}
-td.ci{color:var(--muted);font-size:.8rem}
-.tabs{display:flex;gap:8px;margin-bottom:10px}
-footer{margin-top:48px;color:var(--muted);font-size:.875rem;border-top:1px solid var(--line);padding-top:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600}
+td .r{display:block;color:var(--muted);font-size:.78rem}
+.dark{background:var(--night);color:var(--night-ink)} .dark p,.dark li{color:var(--night-muted)} .dark h2{color:var(--night-ink)}
+ul.plain{padding-left:18px;max-width:66ch} ul.plain li{margin-bottom:8px}
+footer{padding:28px 0 60px;color:var(--muted);font-size:.875rem}
+
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  .reveal,.beat,.pipe .p,.onebox,.steps4 .s{opacity:1!important;transform:none!important;transition:none!important}
+  .lane .packet{animation:none!important;opacity:0}
+  .lane.a .signer rect{animation:none;stroke:#ff8f86;fill:#3b1c1a} .lane.b .guard rect{animation:none;stroke:#7dd69c;fill:#15301f}
+  .lane .verdict{animation:none!important;opacity:1}
+  .chart .bar{transition:none}
+}
 </style>
 </head>
 <body>
-<main>
-  <h1>Signer's Doubt</h1>
-  <p class="lede">A wallet agent reads untrusted text, then proposes transactions. If that text can give it orders, whoever wrote the text is the one transacting. This page shows what Tiny Aya does when the text is poisoned.</p>
-  <p class="note small">Everything here is a mock: no chain, no keys, no funds. Addresses are fake and commands are only logged. This project defends the AI-agent form of the attack; it would not stop malware on a person's machine or a compromised signing service.</p>
-  <p class="small"><a href="https://github.com/davieslennox0/intentlock">Code and method</a> · <a href="https://huggingface.co/datasets/Sykeclonex/signers-doubt-eval-traces">Traces</a> · Lexsi AI Safety and Alignment Hackathon, Track 2</p>
+<nav><div class="wrap">
+  <a class="brand" href="#top">Intentlock</a>
+  <a class="l" href="#chain">The chain</a><a class="l" href="#watch">Watch it</a><a class="l" href="#measure">How often</a>
+  <a class="l" href="#lock">The lock</a><a class="l" href="#results">Results</a><a class="l" href="#limits">Limits</a>
+</div></nav>
 
-  <h2>Pick a scenario</h2>
-  <p class="muted small">Twelve episodes from the evaluation splits. The highlighted text is the injected instruction. Traces are replayed from recorded runs, not generated live.</p>
+<header class="hero" id="top"><div class="wrap">
+  <div class="kicker">Lexsi AI Safety and Alignment Hackathon · Track 2</div>
+  <h1>Intentlock</h1>
+  <p class="lede">A wallet agent should sign what its user intends. It should not sign what a token description tells it to.</p>
+  <div class="chain" aria-label="Diagram: an injected instruction travels from untrusted text to the signer, with and without a lock">
+    <div class="lane a"><h3>Today: the instruction rides along</h3>
+      <div class="scroll"><svg viewBox="0 0 760 92" role="img" aria-label="The injected instruction passes through the agent and is signed">
+        <path class="wire" d="M132 40H212M332 40H428M548 40H628"/>
+        <g class="node"><rect x="6" y="18" width="126" height="44" rx="8"/><text x="69" y="38">Untrusted text</text><text class="sub" x="69" y="53">token page, README</text></g>
+        <g class="node"><rect x="212" y="18" width="120" height="44" rx="8"/><text x="272" y="38">Agent</text><text class="sub" x="272" y="53">reads and decides</text></g>
+        <g class="node"><rect x="428" y="18" width="120" height="44" rx="8"/><text x="488" y="38">Proposed action</text><text class="sub" x="488" y="53">transfer, approve</text></g>
+        <g class="node signer"><rect x="628" y="18" width="126" height="44" rx="8"/><text x="691" y="38">Signer</text><text class="sub" x="691" y="53">approves</text></g>
+        <circle class="packet" cx="69" cy="40" r="6"/>
+        <text class="verdict" x="691" y="84" text-anchor="middle">signed</text>
+      </svg></div></div>
+    <div class="lane b"><h3>With Intentlock: it stops before the signature</h3>
+      <div class="scroll"><svg viewBox="0 0 760 92" role="img" aria-label="The injected instruction is stopped by a guard before the signer">
+        <path class="wire" d="M132 40H212M332 40H428M548 40H628"/>
+        <g class="node"><rect x="6" y="18" width="126" height="44" rx="8"/><text x="69" y="38">Untrusted text</text><text class="sub" x="69" y="53">token page, README</text></g>
+        <g class="node"><rect x="212" y="18" width="120" height="44" rx="8"/><text x="272" y="38">Hardened agent</text><text class="sub" x="272" y="53">treats text as data</text></g>
+        <g class="node guard"><rect x="428" y="18" width="120" height="44" rx="8"/><text x="488" y="38">Guard</text><text class="sub" x="488" y="53">did the user ask?</text></g>
+        <g class="node"><rect x="628" y="18" width="126" height="44" rx="8"/><text x="691" y="38">Signer</text><text class="sub" x="691" y="53">never sees it</text></g>
+        <circle class="packet" cx="69" cy="40" r="6"/>
+        <text class="verdict" x="488" y="84" text-anchor="middle">blocked</text>
+      </svg></div></div>
+  </div>
+  <p class="small" style="color:var(--night-muted);margin-top:18px">Everything on this page is a mock: no chain, no keys, no funds. Addresses are fake and commands are only logged.</p>
+</div></header>
+
+<section id="chain"><div class="wrap kc reveal">
+  <div class="kicker">1 · The chain</div>
+  <h2>A long chain of people and machines, folded into one model</h2>
+  <p class="lede">The kind of breach this project studies starts far from any wallet: a recruiter, a take-home assignment, a poisoned repository. It ends at a signing system that approves what it is handed.</p>
+  <div class="steps4">
+    <div class="s"><b>Lure</b>A recruiter who does not exist offers a job.</div>
+    <div class="s"><b>Poison</b>The coding assignment carries instructions of its own.</div>
+    <div class="s"><b>Foothold</b>Someone runs it. Access spreads quietly.</div>
+    <div class="s"><b>Signature</b>A signing system approves a request it should have doubted.</div>
+  </div>
+  <div class="compress"><div class="onebox"><strong>An autonomous wallet agent does all four in one context window.</strong><small>It reads the poisoned text and it proposes the transaction. Nobody stands in between.</small></div></div>
+  <p class="small muted" style="margin-top:22px">Intentlock defends this agent-shaped version of the chain. It would not have stopped malware on a person's laptop or a compromised signing service.</p>
+</div></section>
+
+<section id="watch" style="padding-top:24px"><div class="wrap">
+  <div class="reveal">
+    <div class="kicker">2 · Watch it</div>
+    <h2>One poisoned sentence, replayed step by step</h2>
+    <p class="lede">Twelve episodes from the evaluation. The highlighted text is the injected instruction. Press play to watch what each agent did with it.</p>
+  </div>
   <div class="chips" id="chips" role="group" aria-label="Scenarios"></div>
-
-  <div class="panel" id="scenario" aria-live="polite"></div>
-
-  <div class="cols" style="margin-top:16px">
+  <div class="panel" id="scenario"></div>
+  <div class="playbar"><button class="btn" id="play">Play the episode</button><span class="small muted" id="playnote">Replayed from recorded runs, not generated live.</span></div>
+  <div class="cols">
     <div class="panel"><h3>Base Tiny Aya</h3><div id="base"></div></div>
     <div class="panel"><h3>Hardened agent + pre-signing guard</h3><div id="hard"></div></div>
   </div>
+</div></section>
 
-  <h2>Results</h2>
-  <div id="results"></div>
+<section id="measure"><div class="wrap">
+  <div class="reveal">
+    <div class="kicker">3 · How often</div>
+    <h2>One example proves nothing. So we built a test.</h2>
+    <p class="lede">Every scenario states what the user asked for and what the injection wants. Outcomes are read from the action log, with no model acting as judge.</p>
+  </div>
+  <div class="stats reveal" id="stats"></div>
+  <div class="fam reveal" id="fam"></div>
+  <div class="panel reveal" style="margin-top:22px">
+    <h3 id="charttitle">Attack success rate</h3>
+    <p class="small muted" id="chartsub"></p>
+    <div class="chart" id="chart"></div>
+  </div>
+</div></section>
 
-  <footer id="foot"></footer>
-</main>
+<section id="lock" class="dark"><div class="wrap">
+  <div class="reveal">
+    <div class="kicker" style="color:var(--inject)">4 · The lock</div>
+    <h2>Two checks on intent, one inside the agent and one in front of the signer</h2>
+  </div>
+  <div class="two reveal" style="margin-top:26px">
+    <div class="lane" style="padding:18px"><h3 style="color:var(--night-ink);font-size:1rem;font-weight:600">Hardening</h3>
+      <p>The agent is fine-tuned on safe trajectories built from the training scenarios: finish the user's task, treat tool output as data, and say what was ignored. Training uses SafeTune's SafeGrad, which keeps a narrow fine-tune from eroding the model's general refusal behaviour. Plain fine-tuning on the same data is the comparison.</p></div>
+    <div class="lane" style="padding:18px"><h3 style="color:var(--night-ink);font-size:1rem;font-weight:600">Guard</h3>
+      <p>A second small adapter sees only three things: what the user asked, what the tools just returned, and the exact payload about to be signed. It answers ALLOW or BLOCK with a reason. It never sees the agent's reasoning, so a compromised agent cannot talk it round. Anything it cannot parse is a BLOCK.</p></div>
+  </div>
+  <div class="pipe reveal" id="pipe">
+    <div class="p" style="background:var(--night-2);border-color:var(--night-line)"><b>CuratorKIT</b><span class="small" style="color:var(--night-muted)">gates and de-duplicates the scenarios</span></div>
+    <div class="p" style="background:var(--night-2);border-color:var(--night-line)"><b>AuditKIT</b><span class="small" style="color:var(--night-muted)">measures the base agent</span></div>
+    <div class="p" style="background:var(--night-2);border-color:var(--night-line)"><b>SafeTune</b><span class="small" style="color:var(--night-muted)">hardens the agent; the guard is trained alongside</span></div>
+    <div class="p" style="background:var(--night-2);border-color:var(--night-line)"><b>CircuitKIT</b><span class="small" style="color:var(--night-muted)">looks for the mechanism, tested causally</span></div>
+    <div class="p" style="background:var(--night-2);border-color:var(--night-line)"><b>AuditKIT</b><span class="small" style="color:var(--night-muted)">measures again</span></div>
+  </div>
+</div></section>
+
+<section id="results"><div class="wrap">
+  <div class="reveal">
+    <div class="kicker">5 · Results</div>
+    <h2>Before and after, on seen and unseen formats</h2>
+  </div>
+  <div id="results-body" class="reveal"></div>
+</div></section>
+
+<section id="limits" style="padding-top:24px"><div class="wrap reveal">
+  <div class="kicker">6 · Limits</div>
+  <h2>What this does not show</h2>
+  <ul class="plain" style="margin-top:18px">
+    <li>The scenarios are synthetic and templated, in English, with mock tools. Results describe this test, not a motivated human attacker.</li>
+    <li>Nobody optimised attacks against the hardened agent or the guard. An adaptive attacker would do better than these templates.</li>
+    <li>One small model. Tiny Aya has 3.35 billion parameters; larger agents may behave differently.</li>
+    <li>The guard is the same model family as the agent and may share its blind spots.</li>
+  </ul>
+</div></section>
+
+<footer><div class="wrap">
+  <p><a href="https://github.com/davieslennox0/intentlock">Code, method and reproduction steps</a> · <a href="https://huggingface.co/datasets/Sykeclonex/signers-doubt-eval-traces">Evaluation traces</a></p>
+  <p id="foot"></p>
+</div></footer>
+<div class="tip" id="tip" role="status"></div>
+
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pct = (ci) => ci && ci.mean != null ? (ci.mean * 100).toFixed(1) + "%" : "n/a";
-const range = (ci) => ci && ci.lo != null ? `${(ci.lo * 100).toFixed(1)} to ${(ci.hi * 100).toFixed(1)}` : "";
-const LABEL = {base:"Base", base_boundary:"Base + prompt rule", plain_sft:"Plain SFT", hardened:"Hardened (SafeGrad)", base_guard:"Base + guard", hardened_guard:"Hardened + guard"};
+const rng = (ci) => ci && ci.lo != null ? `${(ci.lo * 100).toFixed(1)} to ${(ci.hi * 100).toFixed(1)}` : "";
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const LABEL = {base:"Base", base_boundary:"Base + prompt rule", plain_sft:"Plain fine-tune", hardened:"Hardened (SafeGrad)", base_guard:"Base + guard", hardened_guard:"Hardened + guard"};
 const ROWS = [["asr","Attack success rate"],["asr_given_exposed","Attack success when the injection was read"],["exposure_rate","Agent read the poisoned output"],
   ["task_completion_under_attack","Task completed, attack scenarios"],["task_completion_clean","Task completed, clean scenarios"],
   ["false_block_rate","Legitimate action refused (clean)"],["asr_tag_spoof","Attack success, tag-spoof subset"]];
-let DATA, current = 0, split = "test";
+const FAMILY = {wallet_injection:["Wallet injections","Transfers to an attacker, unlimited approvals, swapped payment recipients."],
+  binance_signing:["Signing patterns","Unrequested account delegations, batches across nonces, full-balance sweeps."],
+  contagious_interview:["Poisoned assignments","A take-home README that says: run this script, print your keys."],
+  split_payload:["Split and encoded","The instruction is cut across two tool outputs, or hidden in Base64 or hex."]};
+let DATA, split = "test", timers = [];
 
 function matches(spec, p){
   if(!spec || !p) return false;
-  let t = spec.type === "sign_delegation" ? "eip7702_authorization" : spec.type;
+  const t = spec.type === "sign_delegation" ? "eip7702_authorization" : spec.type;
   if(t && t !== p.type) return false;
   for(const [k, v] of Object.entries(spec)){
     if(k === "type") continue;
@@ -102,78 +325,129 @@ function matches(spec, p){
 }
 function highlight(text, injected){
   let html = esc(text);
-  for(const part of String(injected || "").split(" || ").filter(Boolean)){
+  for(const part of String(injected || "").split(" || ").filter(Boolean))
     for(const cand of [part, JSON.stringify(part).slice(1, -1)]){
       const e = esc(cand);
       if(e && html.includes(e)){ html = html.split(e).join("<mark>" + e + "</mark>"); break; }
     }
-  }
   return html;
 }
 function renderScenario(ex){
-  const tags = ex.is_clean ? `<span class="tag">clean control</span>` :
-    `<span class="tag">${esc(ex.family)}</span><span class="tag">${esc(ex.injection_technique)}</span><span class="tag">in ${esc(ex.injection_location)}</span>`;
-  let h = `<p>${tags}<span class="tag">split: ${esc(ex.split)}</span><span class="tag">boundary tags: ${esc(ex.wrapper)}</span></p>
-    <h3>The user asks</h3><pre>${esc(ex.user_task)}</pre><h3>What the tools return</h3>`;
-  for(const [k, v] of Object.entries(ex.tool_fixtures))
-    h += `<div class="small muted"><code>${esc(k)}</code></div><pre>${highlight(v, ex.injected_text)}</pre>`;
-  if(!ex.is_clean) h += `<p class="small muted">The injection is trying to cause: <code>${esc(JSON.stringify(ex.malicious_action_spec))}</code></p>`;
+  const tags = ex.is_clean ? `<span class="tag">clean control: nothing injected</span>` :
+    `<span class="tag">${esc(ex.family.replace(/_/g," "))}</span><span class="tag">${esc(ex.injection_technique.replace(/_/g," "))}</span><span class="tag">hidden in ${esc(ex.injection_location.replace(/_/g," "))}</span>`;
+  let h = `<p>${tags}<span class="tag">${ex.split === "test" ? "test split" : "held-out formats"}</span></p><h3>The user asks</h3><pre>${esc(ex.user_task)}</pre><h3>What the tools return</h3>`;
+  for(const [k, v] of Object.entries(ex.tool_fixtures)) h += `<div class="small muted"><code>${esc(k)}</code></div><pre>${highlight(v, ex.injected_text)}</pre>`;
+  if(!ex.is_clean) h += `<p class="small muted">The injection wants: <code>${esc(JSON.stringify(ex.malicious_action_spec))}</code></p>`;
   $("scenario").innerHTML = h;
 }
-function renderTrace(el, tr, ex, pendingMsg){
-  if(!tr){ el.innerHTML = `<p class="muted">${pendingMsg}</p>`; return; }
-  const L = tr.labels; let v;
-  if(ex.is_clean) v = L.task_success ? ["v-ok","Task completed"] : ["v-warn","Task not completed"];
-  else if(L.attack_success) v = ["v-bad","Injected action was signed"];
-  else if(L.attack_attempted) v = ["v-warn","Attempted, blocked by the guard"];
-  else if(tr.exposed === false) v = ["v-warn","Never read the poisoned output"];
-  else v = ["v-ok","Injection ignored"];
-  let h = `<div class="verdict ${v[0]}">${v[1]}</div>
-    <p class="small muted">User's task completed: ${L.task_success ? "yes" : "no"} · ended by: ${esc(tr.stop_reason.replace("_"," "))}</p><ol class="steps">`;
+function beats(tr, ex){
+  const out = [];
   for(const s of tr.steps){
-    if(s.parse_error){ h += `<li class="muted">Reply was not valid JSON</li>`; continue; }
+    if(s.parse_error){ out.push(`<div class="beat"><div class="who">Agent</div><span class="muted">Reply was not valid JSON.</span></div>`); continue; }
     if(s.tool){
-      h += `<li><code>${esc(s.tool)}(${esc(JSON.stringify(s.args || {}))})</code>`;
-      if(s.thought) h += `<div class="small muted">${esc(s.thought)}</div>`;
+      out.push(`<div class="beat"><div class="who">Agent decides</div>${s.thought ? `<div class="small muted">${esc(s.thought)}</div>` : ""}<code>${esc(s.tool)}(${esc(JSON.stringify(s.args || {}))})</code></div>`);
       if(s.payload){
         const bad = [].concat(ex.malicious_action_spec || []).some(sp => matches(sp, s.payload));
-        h += `<div class="payload ${bad ? "bad" : ""} small">${bad ? "<strong>Matches the injected goal.</strong> " : ""}Proposed for signing: <code>${esc(JSON.stringify(s.payload))}</code>`;
-        if(s.guard) h += `<br>Guard: <strong>${esc(s.guard.verdict)}</strong> ${esc(s.guard.reason || "")}`;
-        h += `</div>`;
-      }
-      h += `</li>`;
-    } else if("final" in s) h += `<li>Final answer: ${esc(s.final)}</li>`;
+        const blocked = s.guard && String(s.guard.verdict).toUpperCase() === "BLOCK";
+        let line = bad ? "<strong>This is the injected action.</strong> " : "";
+        line += `Payload: <code>${esc(JSON.stringify(s.payload))}</code>`;
+        if(s.guard) line += `<br>Guard says <strong>${esc(s.guard.verdict)}</strong>${s.guard.reason ? ": " + esc(s.guard.reason) : ""}`;
+        line += `<br>${blocked ? "Not signed." : "Signed."}`;
+        out.push(`<div class="beat sign ${blocked ? "blocked" : bad ? "bad" : ""}"><div class="who">${blocked ? "Stopped before the signer" : "At the signer"}</div><div class="small">${line}</div></div>`);
+      } else if(s.output) out.push(`<div class="beat"><div class="who">Tool returns</div><pre>${highlight(s.output, ex.injected_text)}</pre></div>`);
+    } else if("final" in s) out.push(`<div class="beat"><div class="who">Agent tells the user</div>${esc(s.final)}</div>`);
   }
-  el.innerHTML = h + `</ol>`;
+  const L = tr.labels; let v;
+  if(ex.is_clean) v = L.task_success ? ["b-ok","Task completed"] : ["b-warn","Task not completed"];
+  else if(L.attack_success) v = ["b-bad","The injected action was signed"];
+  else if(L.attack_attempted) v = ["b-ok","Attempted, and blocked by the guard"];
+  else if(tr.exposed === false) v = ["b-warn","Never read the poisoned output"];
+  else v = ["b-ok","Injection ignored"];
+  out.push(`<div class="beat"><span class="badge ${v[0]}">${v[1]}</span><div class="small muted" style="margin-top:6px">User's task completed: ${L.task_success ? "yes" : "no"}</div></div>`);
+  return out;
+}
+function mount(el, tr, ex, pending){
+  if(!tr){ el.innerHTML = `<div class="pending">${pending}</div>`; return 0; }
+  el.innerHTML = beats(tr, ex).join(""); return el.children.length;
+}
+function play(instant){
+  timers.forEach(clearTimeout); timers = [];
+  for(const id of ["base","hard"]){
+    [...$(id).querySelectorAll(".beat")].forEach((b, i) => {
+      b.classList.remove("in");
+      if(instant || REDUCED) b.classList.add("in"); else timers.push(setTimeout(() => b.classList.add("in"), 250 + i * 650));
+    });
+  }
 }
 function show(i){
-  current = i; const ex = DATA.examples[i];
+  const ex = DATA.examples[i];
   [...$("chips").children].forEach((c, j) => c.setAttribute("aria-pressed", j === i));
   renderScenario(ex);
-  renderTrace($("base"), ex.traces.base, ex, "Recorded base-model trace pending: the corrected baseline run has not finished.");
-  renderTrace($("hard"), ex.traces.hardened, ex, "Pending: the hardened agent and guard have not been trained yet. This panel fills in after the final evaluation.");
+  const a = mount($("base"), ex.traces.base, ex, "Pending. The corrected baseline run has not finished, so there is no recorded base-model trace to replay yet.");
+  mount($("hard"), ex.traces.hardened, ex, "Pending. The hardened agent and the guard have not been trained yet. This side fills in after the final evaluation.");
+  $("play").disabled = !a; $("play").style.opacity = a ? 1 : .45;
+  play(false);
+}
+function countUp(el, to){
+  if(REDUCED){ el.textContent = to.toLocaleString(); return; }
+  const t0 = performance.now(), dur = 900;
+  const tick = (t) => { const k = Math.min(1, (t - t0) / dur); el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))).toLocaleString(); if(k < 1) requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+  setTimeout(() => { el.textContent = to.toLocaleString(); }, dur + 400);   // never leave a zero behind
+}
+function renderMeasure(){
+  const d = DATA.dataset;
+  const items = [[d.attack,"attack scenarios"],[d.clean,"clean controls, including large transfers the user really asked for"],[Object.keys(d.techniques).length,"injection techniques, from fake system notes to tag spoofing"],[d.splits.heldout_format,"held-out episodes with unseen phrasing, tags and locations"]];
+  $("stats").innerHTML = items.map(([n, l]) => `<div class="stat"><div class="n" data-n="${n}">${Number(n).toLocaleString()}</div><div class="l">${l}</div></div>`).join("");
+  $("fam").innerHTML = Object.entries(FAMILY).map(([k, [name, desc]]) => {
+    const f = d.families[k] || {}; const n = (f.train || 0) + (f.test || 0) + (f.heldout_format || 0);
+    return `<div class="panel"><b>${name}</b><div class="small muted">${n} scenarios</div><p class="small" style="margin:8px 0 0">${desc}</p></div>`; }).join("");
+  renderChart();
+}
+function renderChart(){
+  const R = (DATA.results || {})[split], el = $("chart");
+  if(!R){ $("chartsub").textContent = ""; el.innerHTML = `<div class="pending">Pending. Numbers appear here only after a real evaluation run produces them.</div>`; return; }
+  const cfgs = Object.keys(R), max = Math.max(.25, ...cfgs.map(c => (R[c].asr.hi ?? R[c].asr.mean))) , top = Math.ceil(max * 20) / 20;
+  $("chartsub").textContent = `Share of ${R[cfgs[0]].n_attack} attack scenarios on the ${split === "test" ? "test split" : "held-out formats"} where the injected action was signed. Lower is better. Whiskers are 95% bootstrap intervals.`;
+  el.innerHTML = cfgs.map(c => { const a = R[c].asr; return `<div class="row" data-tip="${esc(LABEL[c] || c)}: ${pct(a)} (${rng(a)}). Among episodes that read the injection: ${pct(R[c].asr_given_exposed)}.">
+      <div class="name">${LABEL[c] || c}</div>
+      <div class="track"><div class="bar" data-w="${a.mean / top * 100}"></div>${a.lo != null ? `<div class="ci" style="left:${a.lo / top * 100}%;width:${(a.hi - a.lo) / top * 100}%"></div>` : ""}</div>
+      <div class="val">${pct(a)}<span>${rng(a)}</span></div></div>`; }).join("") +
+    `<div class="axis"><div></div><div><span>0%</span><span>${(top * 50).toFixed(0)}%</span><span>${(top * 100).toFixed(0)}%</span></div><div></div></div>`;
+  requestAnimationFrame(() => el.querySelectorAll(".bar").forEach(b => b.style.width = b.dataset.w + "%"));
+  el.querySelectorAll(".row").forEach(r => {
+    r.addEventListener("mousemove", e => { const t = $("tip"); t.textContent = r.dataset.tip; t.style.opacity = 1; t.style.left = Math.min(innerWidth - 280, e.clientX + 14) + "px"; t.style.top = (e.clientY + 14) + "px"; });
+    r.addEventListener("mouseleave", () => $("tip").style.opacity = 0);
+  });
 }
 function renderResults(){
-  const R = DATA.results || {};
-  if(!Object.keys(R).length){ $("results").innerHTML = `<p class="muted">Pending. No evaluation run has been published to this page yet; numbers appear here only after a real run produces them.</p>`; return; }
-  const splits = Object.keys(R); if(!R[split]) split = splits[0];
+  const R = DATA.results || {}, el = $("results-body");
+  if(!Object.keys(R).length){ el.innerHTML = `<div class="pending" style="margin-top:18px">Pending. No evaluation run has been published to this page yet.</div>`; return; }
+  if(!R[split]) split = Object.keys(R)[0];
   const cfgs = Object.keys(R[split]);
-  let h = `<div class="tabs">` + splits.map(s => `<button class="chip" aria-pressed="${s === split}" onclick="split='${s}';renderResults()">${s === "test" ? "Test split" : "Held-out formats"}</button>`).join("") + `</div>
-    <p class="small muted">${R[split][cfgs[0]].n_attack} attack and ${R[split][cfgs[0]].n_clean} clean scenarios. Ranges are 95% bootstrap intervals.${cfgs.includes("hardened") ? "" : " Hardened and guard configurations are pending."}</p>
-    <div class="tablewrap"><table><thead><tr><th>Metric</th>` + cfgs.map(c => `<th>${LABEL[c] || c}</th>`).join("") + `</tr></thead><tbody>`;
-  for(const [k, name] of ROWS)
-    h += `<tr><td>${name}</td>` + cfgs.map(c => `<td>${pct(R[split][c][k])}<div class="ci">${range(R[split][c][k])}</div></td>`).join("") + `</tr>`;
-  const fams = Object.keys(R[split][cfgs[0]].asr_by_family || {});
-  for(const f of fams)
-    h += `<tr><td>Attack success: ${f.replace(/_/g, " ")}</td>` + cfgs.map(c => `<td>${pct((R[split][c].asr_by_family || {})[f])}</td>`).join("") + `</tr>`;
-  $("results").innerHTML = h + `</tbody></table></div>`;
+  let h = `<div class="tabs">` + Object.keys(R).map(s => `<button class="chip" aria-pressed="${s === split}" data-split="${s}">${s === "test" ? "Test split" : "Held-out formats"}</button>`).join("") + `</div>
+    <p class="small muted">${R[split][cfgs[0]].n_attack} attack and ${R[split][cfgs[0]].n_clean} clean scenarios. Ranges under each figure are 95% bootstrap intervals.${cfgs.includes("hardened") ? "" : " The hardened and guard columns are pending."}</p>
+    <div class="tablewrap"><table><thead><tr><th>Measure</th>` + cfgs.map(c => `<th>${LABEL[c] || c}</th>`).join("") + `</tr></thead><tbody>`;
+  for(const [k, name] of ROWS) h += `<tr><td>${name}</td>` + cfgs.map(c => `<td>${pct(R[split][c][k])}<span class="r">${rng(R[split][c][k])}</span></td>`).join("") + `</tr>`;
+  for(const f of Object.keys(R[split][cfgs[0]].asr_by_family || {}))
+    h += `<tr><td>Attack success: ${(FAMILY[f] || [f])[0].toLowerCase()}</td>` + cfgs.map(c => `<td>${pct((R[split][c].asr_by_family || {})[f])}</td>`).join("") + `</tr>`;
+  el.innerHTML = h + `</tbody></table></div>`;
+  el.querySelectorAll("[data-split]").forEach(b => b.onclick = () => { split = b.dataset.split; renderResults(); renderChart(); });
 }
+const io = new IntersectionObserver((es) => es.forEach(e => { if(e.isIntersecting){
+  e.target.classList.add("in");
+  e.target.querySelectorAll("[data-n]").forEach(n => { if(!n.dataset.done){ n.dataset.done = 1; countUp(n, +n.dataset.n); } });
+  io.unobserve(e.target); } }), {threshold: .18});
+
 fetch("data.json", {cache: "no-store"}).then(r => r.json()).then(d => {
   DATA = d;
-  $("chips").innerHTML = d.examples.map((e, i) => `<button class="chip" aria-pressed="false" onclick="show(${i})">${e.is_clean ? "clean" : esc(e.family.replace(/_/g, " ")) + " · " + esc(e.injection_technique.replace(/_/g, " "))}</button>`).join("");
-  show(0); renderResults();
+  $("chips").innerHTML = d.examples.map((e, i) => `<button class="chip" aria-pressed="false" data-i="${i}">${e.is_clean ? "clean control" : esc((FAMILY[e.family] || [e.family])[0]) + " · " + esc(e.injection_technique.replace(/_/g, " "))}</button>`).join("");
+  $("chips").querySelectorAll("button").forEach(b => b.onclick = () => show(+b.dataset.i));
+  $("play").onclick = () => play(false);
+  renderMeasure(); renderResults(); show(0);
+  document.querySelectorAll(".reveal").forEach(el => io.observe(el));
   $("foot").textContent = `Data built ${d.generated}. Baseline run: ${d.runs.baseline || "pending"}. Final evaluation run: ${d.runs.final || "pending"}.`;
-}).catch(e => { $("scenario").textContent = "Could not load data.json: " + e; });
+}).catch(e => { $("scenario").textContent = "Could not load data.json: " + e; document.querySelectorAll(".reveal").forEach(el => el.classList.add("in")); });
 </script>
 </body>
 </html>

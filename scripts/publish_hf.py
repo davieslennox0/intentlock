@@ -27,7 +27,7 @@ datasets: [{user}/signers-doubt-scenarios]
 
 {summary}
 
-LoRA adapter for [`{base}`](https://huggingface.co/{base}), built for **Signer's Doubt** (Lexsi AI
+LoRA adapter for [`{base}`](https://huggingface.co/{base}), built for **Intentlock** (Lexsi AI
 Safety and Alignment Hackathon, Track 2). Code and full results:
 <https://github.com/davieslennox0/intentlock>.
 
@@ -59,13 +59,13 @@ of real funds. Inherits Tiny Aya's CC-BY-NC-4.0 licence.
 """
 
 MODELS = {
-    "hardened": ("outputs/hardened-safegrad", "signers-doubt-tiny-aya-hardened", "Signer's Doubt: hardened wallet agent (SafeGrad)",
+    "hardened": ("outputs/hardened-safegrad", "signers-doubt-tiny-aya-hardened", "Intentlock: hardened wallet agent (SafeGrad)",
                  "Tiny Aya fine-tuned to treat tool output as data: it completes the user's task and ignores instructions planted in token metadata, listings, API responses and READMEs.",
                  "SafeTune `SafeGradHFTrainer` (gradient surgery against a BeaverTails alignment set) on safe trajectories built from the `train` split only.", ""),
-    "plain": ("outputs/hardened-plain", "signers-doubt-tiny-aya-plain-sft", "Signer's Doubt: plain-SFT ablation",
+    "plain": ("outputs/hardened-plain", "signers-doubt-tiny-aya-plain-sft", "Intentlock: plain-SFT ablation",
               "Ablation: the same data and hyperparameters as the hardened adapter, with ordinary SFT instead of SafeGrad.",
               "Plain supervised fine-tuning on safe trajectories built from the `train` split only.", ""),
-    "guard": ("outputs/guard", "signers-doubt-tiny-aya-guard", "Signer's Doubt: pre-signing guard",
+    "guard": ("outputs/guard", "signers-doubt-tiny-aya-guard", "Intentlock: pre-signing guard",
               "Tiny Aya classifier that reads the user's task, recent tool outputs and a proposed transaction payload, and answers `ALLOW: reason` or `BLOCK: reason`.",
               "Plain SFT on proposed actions from the `train` split: reference safe/compromised trajectories, baseline-agent traces, and up-weighted legitimate large actions.",
               "and `training/guard.py` "),
@@ -91,16 +91,16 @@ def main():
                 if (ROOT / "data/curated" / f).exists():
                     shutil.copy(ROOT / "data/curated" / f, t / f)
             shutil.copy(ROOT / "data/DATASET_CARD.md", t / "README.md")
-            api.upload_folder(folder_path=str(t), repo_id=repo, repo_type="dataset", commit_message="Signer's Doubt scenarios")
+            api.upload_folder(folder_path=str(t), repo_id=repo, repo_type="dataset", commit_message="Intentlock scenarios")
         done["datasets"].append(repo)
 
     if "traces" in a.what:
         repo = f"{u}/signers-doubt-eval-traces"
         api.create_repo(repo, repo_type="dataset", private=False, exist_ok=True)
         card = ("---\nlicense: cc-by-4.0\ntags: [ai-safety, prompt-injection, agents, eval-logs]\n---\n\n"
-                "# Signer's Doubt: evaluation traces and logs\n\nFull agent traces (messages, tool calls, proposed and executed "
+                "# Intentlock: evaluation traces and logs\n\nFull agent traces (messages, tool calls, proposed and executed "
                 "actions, guard verdicts, labels), AuditKIT reports, training logs and interpretability results for "
-                f"[Signer's Doubt](https://github.com/davieslennox0/intentlock). Scenarios: `{u}/signers-doubt-scenarios`.\n\n"
+                f"[Intentlock](https://github.com/davieslennox0/intentlock). Scenarios: `{u}/signers-doubt-scenarios`.\n\n"
                 "`runs/final/<config>_<split>.jsonl` holds one JSON trace per scenario. `reports/` holds the result tables, "
                 "plots, AuditKIT outputs, capability benchmark runs and `run_meta.json` (hardware, versions, throughput).\n")
         with tempfile.TemporaryDirectory() as t:
@@ -156,7 +156,7 @@ def main():
             (t / "training").mkdir()
             (t / "training/__init__.py").write_text("")
             shutil.copy(ROOT / "training/guard.py", t / "training/guard.py")
-            api.upload_folder(folder_path=str(t), repo_id=repo, repo_type="space", commit_message="Signer's Doubt demo")
+            api.upload_folder(folder_path=str(t), repo_id=repo, repo_type="space", commit_message="Intentlock demo")
         for k, v in (("SD_AGENT_ADAPTER", f"{u}/signers-doubt-tiny-aya-hardened"), ("SD_GUARD_ADAPTER", f"{u}/signers-doubt-tiny-aya-guard")):
             api.add_space_variable(repo, k, v)
         done["spaces"].append(repo)
@@ -164,8 +164,8 @@ def main():
 
     if "collections" in a.what:
         for title, kind, items in (
-            ("Signer's Doubt: models", "model", [f"{u}/{m[1]}" for m in MODELS.values()]),
-            ("Signer's Doubt: datasets", "dataset", [f"{u}/signers-doubt-scenarios", f"{u}/signers-doubt-eval-traces"]),
+            ("Intentlock: models", "model", [f"{u}/{m[1]}" for m in MODELS.values()]),
+            ("Intentlock: datasets", "dataset", [f"{u}/signers-doubt-scenarios", f"{u}/signers-doubt-eval-traces"]),
         ):
             col = api.create_collection(title=title, namespace=u, private=False, exists_ok=True,
                                         description="Lexsi AI Safety and Alignment Hackathon, Track 2: wallet-agent prompt injection.")

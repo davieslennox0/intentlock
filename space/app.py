@@ -1,4 +1,4 @@
-"""Signer's Doubt demo: the same poisoned context through base and hardened Tiny Aya.
+"""Intentlock demo: the same poisoned context through base and hardened Tiny Aya.
 
 Everything is a mock. No chain, no keys, no funds, and `run_command` only logs.
 Environment:
@@ -123,8 +123,8 @@ def run(task, fixtures_json, label, use_guard):
     return render(left, scenario), render(right, scenario)
 
 
-with gr.Blocks(title="Signer's Doubt") as demo:
-    gr.Markdown("# Signer's Doubt\nA wallet agent reads untrusted text and proposes transactions. "
+with gr.Blocks(title="Intentlock") as demo:
+    gr.Markdown("# Intentlock\nA wallet agent reads untrusted text and proposes transactions. "
                 "Pick a poisoned context (or edit your own) and compare base Tiny Aya with the hardened agent and guard.\n\n"
                 "**Everything here is a mock.** No chain, keys or funds; addresses are fake; commands are only logged."
                 + ("" if live_available() else "\n\n_Running on CPU: unmodified examples replay traces recorded during the evaluation._"))
