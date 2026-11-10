@@ -1,0 +1,16 @@
+{
+  "check": "curatorkit",
+  "model": "CohereLabs/tiny-aya-global",
+  "python": "3.12.16",
+  "ok": true,
+  "result": {
+    "curatorkit": "0.1.21",
+    "raw": 1430,
+    "after_curatorkit": 1356,
+    "final": 1099,
+    "note": "Tiny Aya is not used by CuratorKIT here: generation is template-based."
+  },
+  "seconds": 11.1,
+  "device": "cpu",
+  "torch": "2.15.0+cpu"
+}

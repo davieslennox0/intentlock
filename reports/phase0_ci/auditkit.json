@@ -1,0 +1,18 @@
+{
+  "check": "auditkit",
+  "model": "CohereLabs/tiny-aya-global",
+  "python": "3.12.16",
+  "ok": true,
+  "result": {
+    "auditkit": "1.1.6",
+    "headline": {
+      "exact_match": 1.0,
+      "f1_score": 1.0
+    },
+    "failed_count": 0,
+    "summary": "run 5faae8925ea6bec0 (fingerprint 5faae8925ea6bec0)\n  exact_match: 1.0000 \u00b1 0.0000  (n=2)\n  f1_score: 1.0000 \u00b1 0.0000  (n=2)\n  perf: latency=52574ms (n=1 calls) | throughput=0.04 req/s\n  model: CohereLabs/tiny-aya-global -- 3,349,227,520 params (0.0% sparse), 6388.1 MB"
+  },
+  "seconds": 61.3,
+  "device": "cpu",
+  "torch": "2.15.0+cpu"
+}

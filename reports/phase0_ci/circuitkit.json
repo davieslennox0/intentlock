@@ -1,0 +1,21 @@
+{
+  "check": "circuitkit",
+  "model": "CohereLabs/tiny-aya-global",
+  "python": "3.12.16",
+  "ok": true,
+  "result": {
+    "circuitkit": "0.2.1",
+    "load_seconds": 150.9,
+    "n_nodes": 182,
+    "top_nodes": [
+      "MLP 0",
+      "A27.3",
+      "A26.15",
+      "A30.3",
+      "A28.9"
+    ]
+  },
+  "seconds": 294.4,
+  "device": "cpu",
+  "torch": "2.15.0+cpu"
+}

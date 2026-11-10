@@ -20,7 +20,7 @@ mechanism inside the model.
 
 | Phase | State |
 |---|---|
-| 0. Library smoke tests on Tiny Aya | Code and CI workflow ready; **not yet run** (needs gated-model access) |
+| 0. Library smoke tests on Tiny Aya | On GitHub CPU runners: transformers, AuditKIT, CuratorKIT and CircuitKIT pass; `pip check` reports no conflicts. The SafeTune training check exited without a traceback on the 16 GB runner and is **pending a GPU run** |
 | 1. Testbed | Done, unit-tested |
 | 2. Dataset (CuratorKIT) | Done: 799 attack + 300 clean scenarios |
 | 3. Baseline audit (AuditKIT) | Code ready; **not yet run** |
