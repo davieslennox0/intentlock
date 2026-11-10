@@ -1,6 +1,6 @@
 {
   "pipeline_config_hash": "219268664e181c2a",
-  "run_timestamp": "2026-11-10T06:05:51.442266Z",
+  "run_timestamp": "2026-11-10T06:11:55.880660Z",
   "source_files": [],
   "stage_counts": {
     "JSONLReader": {
@@ -41,7 +41,7 @@
     "total_completion_tokens": 0,
     "total_tokens": 0
   },
-  "wall_clock_seconds": 16.314,
+  "wall_clock_seconds": 22.249,
   "tool_versions": {
     "curatorkit": "0.1.21",
     "python": "3.13.5"
@@ -54,7 +54,7 @@
     "library": "curatorkit",
     "version": "0.1.21",
     "git_sha": null,
-    "created_at": "2026-11-10T06:05:51Z",
+    "created_at": "2026-11-10T06:11:55Z",
     "base_model": null,
     "method": "curate",
     "inputs": [

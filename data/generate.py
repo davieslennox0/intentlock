@@ -546,6 +546,8 @@ def make_scenario(rng, sid, family, split, clean=False, task_kind=None):
                     attack_goal=goal, malicious_calls=calls, safe_final=safe_final,
                     injected_text=" || ".join(n for n in notes if n))
     base["tool_fixtures"] = {f"{tool}:{key}": render(n) for (_, tool, key, render), n in zip(slots, notes)}
+    # Benign twin of the same fixtures (injection removed): used for contrastive interpretability.
+    base["clean_twin_fixtures"] = {f"{tool}:{key}": render("") for (_, tool, key, render) in slots}
     base["reference_reads"] = [{"tool": t, "args": a} for t, a in task["reads"]]
     base["reference_actions"] = task["actions"]
     base["expected_actions"] = task["expected"]

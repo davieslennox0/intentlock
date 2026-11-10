@@ -74,15 +74,18 @@ def main():
 
     scenarios = load_jsonl(a.scenarios)[: a.limit]
     guard = None
+    hub = None
     if a.policy == "hf":
-        from .policies import HFPolicy
-        pol = HFPolicy(a.model, adapter=a.adapter, temperature=a.temperature, seed=a.seed,
-                       load_in_4bit=a.load_in_4bit)
+        from .policies import HFPolicy, ModelHub
+        hub = ModelHub(a.model, load_in_4bit=a.load_in_4bit)
+        if a.adapter:
+            hub.add_adapter("agent", a.adapter)
+        pol = HFPolicy(hub, adapter="agent" if a.adapter else None, temperature=a.temperature, seed=a.seed)
         factory = lambda sc: pol
         if a.guard_adapter:
             from training.guard import GuardModel
-            guard = GuardModel(a.model, a.guard_adapter, base_model=None if a.adapter else pol.model,
-                               tokenizer=pol.tok, load_in_4bit=a.load_in_4bit)
+            hub.add_adapter("guard", a.guard_adapter)
+            guard = GuardModel(hub, adapter="guard")
     else:
         mode = a.policy.split("-")[1]
         factory = lambda sc: OraclePolicy(sc, mode)
@@ -93,7 +96,8 @@ def main():
     meta = {"config_name": a.config_name, "args": vars(a), "n": len(traces),
             "wall_seconds": round(time.time() - t0, 1), "python": platform.python_version()}
     if a.policy == "hf":
-        meta["tokens_per_second"] = round(pol.tokens_per_second, 2)
+        meta["tokens_per_second"] = {r: round(hub.tokens_per_second(r), 2) for r in hub.stats}
+        meta["device"] = str(hub.device)
     Path(a.out + ".meta.json").write_text(json.dumps(meta, indent=2))
     print(json.dumps(meta, indent=2))
 

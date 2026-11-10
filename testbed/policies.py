@@ -44,21 +44,20 @@ class OraclePolicy(ScriptedPolicy):
         super().__init__(oracle_turns(scenario, mode))
 
 
-class HFPolicy:
-    """Tiny Aya through transformers, with an optional LoRA adapter and optional
-    activation hook (used by the steering experiments)."""
+class ModelHub:
+    """One copy of Tiny Aya shared by every role (agent, hardened agent, guard).
 
-    def __init__(self, model_id: str = DEFAULT_MODEL, adapter: Optional[str] = None,
-                 temperature: float = 0.0, max_new_tokens: int = 220, seed: int = 0,
-                 dtype: str = "auto", device_map: str = "auto", load_in_4bit: bool = False,
-                 model=None, tokenizer=None):
+    Adapters are attached by name and switched per call, so base agent, hardened
+    agent and guard fit on one 16 GB GPU. `adapter=None` runs the plain base model.
+    """
+
+    def __init__(self, model_id: str = DEFAULT_MODEL, dtype: str = "auto", device_map: str = "auto",
+                 load_in_4bit: bool = False, model=None, tokenizer=None):
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
-        self.torch = torch
-        self.model_id, self.adapter = model_id, adapter
-        self.temperature, self.max_new_tokens, self.seed = temperature, max_new_tokens, seed
+        self.torch, self.model_id = torch, model_id
         if model is not None:
-            self.model, self.tok = model, tokenizer
+            self.base, self.tok = model, tokenizer
         else:
             self.tok = AutoTokenizer.from_pretrained(model_id)
             kw = {"device_map": device_map}
@@ -69,19 +68,31 @@ class HFPolicy:
             elif dtype != "auto":
                 kw["dtype"] = getattr(torch, dtype)
             elif torch.cuda.is_available():
-                kw["dtype"] = torch.bfloat16
-            self.model = AutoModelForCausalLM.from_pretrained(model_id, **kw)
-            if adapter:
-                from peft import PeftModel
-                self.model = PeftModel.from_pretrained(self.model, adapter)
-        self.model.eval()
+                kw["dtype"] = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+            self.base = AutoModelForCausalLM.from_pretrained(model_id, **kw)
+        self.base.eval()
+        self.peft = None
+        self.adapters: dict[str, str] = {}
         self.system_ok = True
-        self.tokens_generated, self.gen_seconds = 0, 0.0
+        self.stats = {}      # role -> [tokens, seconds, calls]
+
+    @property
+    def device(self):
+        return next(self.base.parameters()).device
+
+    def add_adapter(self, name: str, path: str):
+        from peft import PeftModel
+        if name in self.adapters:
+            return
+        if self.peft is None:
+            self.peft = PeftModel.from_pretrained(self.base, path, adapter_name=name)
+        else:
+            self.peft.load_adapter(path, adapter_name=name)
+        self.peft.eval()
+        self.adapters[name] = path
 
     def _encode(self, messages):
-        msgs = messages
-        if not self.system_ok:
-            msgs = self._fold_system(messages)
+        msgs = messages if self.system_ok else self._fold_system(messages)
         try:
             return self.tok.apply_chat_template(msgs, add_generation_prompt=True,
                                                 return_tensors="pt", return_dict=True)
@@ -99,24 +110,47 @@ class HFPolicy:
             return [first] + list(messages[2:])
         return messages
 
-    def generate(self, messages) -> str:
+    def generate(self, messages, adapter: Optional[str] = None, max_new_tokens: int = 220,
+                 temperature: float = 0.0, seed: int = 0, role: str = "agent") -> str:
+        import contextlib
         import time
         torch = self.torch
-        enc = self._encode(messages).to(self.model.device)
-        kw = {"max_new_tokens": self.max_new_tokens, "pad_token_id": self.tok.pad_token_id or self.tok.eos_token_id}
-        if self.temperature and self.temperature > 0:
-            torch.manual_seed(self.seed)
-            kw.update(do_sample=True, temperature=self.temperature, top_p=0.95)
+        enc = self._encode(messages).to(self.device)
+        kw = {"max_new_tokens": max_new_tokens,
+              "pad_token_id": self.tok.pad_token_id if self.tok.pad_token_id is not None else self.tok.eos_token_id}
+        if temperature and temperature > 0:
+            torch.manual_seed(seed)
+            kw.update(do_sample=True, temperature=temperature, top_p=0.95)
         else:
             kw.update(do_sample=False)
+        if self.peft is None:
+            model, ctx = self.base, contextlib.nullcontext()
+        elif adapter is None:
+            model, ctx = self.peft, self.peft.disable_adapter()
+        else:
+            self.peft.set_adapter(adapter)
+            model, ctx = self.peft, contextlib.nullcontext()
         t0 = time.perf_counter()
-        with torch.no_grad():
-            out = self.model.generate(**enc, **kw)
+        with torch.no_grad(), ctx:
+            out = model.generate(**enc, **kw)
         new = out[0, enc["input_ids"].shape[1]:]
-        self.gen_seconds += time.perf_counter() - t0
-        self.tokens_generated += int(new.shape[0])
+        st = self.stats.setdefault(role, [0, 0.0, 0])
+        st[0] += int(new.shape[0]); st[1] += time.perf_counter() - t0; st[2] += 1
         return self.tok.decode(new, skip_special_tokens=True).strip()
 
-    @property
-    def tokens_per_second(self) -> float:
-        return self.tokens_generated / self.gen_seconds if self.gen_seconds else 0.0
+    def tokens_per_second(self, role: str = "agent") -> float:
+        t, s, _ = self.stats.get(role, [0, 0.0, 0])
+        return t / s if s else 0.0
+
+
+class HFPolicy:
+    """Agent policy backed by a ModelHub. `adapter` is an adapter NAME registered on the hub."""
+
+    def __init__(self, hub: "ModelHub", adapter: Optional[str] = None, temperature: float = 0.0,
+                 max_new_tokens: int = 220, seed: int = 0):
+        self.hub, self.adapter = hub, adapter
+        self.temperature, self.max_new_tokens, self.seed = temperature, max_new_tokens, seed
+
+    def generate(self, messages) -> str:
+        return self.hub.generate(messages, adapter=self.adapter, max_new_tokens=self.max_new_tokens,
+                                 temperature=self.temperature, seed=self.seed, role="agent")

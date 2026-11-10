@@ -3,7 +3,7 @@
   "library": "curatorkit",
   "version": "0.1.21",
   "git_sha": null,
-  "created_at": "2026-11-10T06:05:51Z",
+  "created_at": "2026-11-10T06:11:55Z",
   "base_model": null,
   "method": "curate",
   "inputs": [
