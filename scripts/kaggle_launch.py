@@ -47,10 +47,10 @@ STAGES = {
     "smoke_train": [["python -m training.build_sft"] + SMOKE_TRAIN],
     "train": [
         ["python -m training.build_sft",
-         "python -m training.harden_safetune --method safegrad {train_args} --out outputs/hardened-safegrad",
-         "python -m training.harden_safetune --method plain {train_args} --out outputs/hardened-plain"],
+         "python -m training.harden_safetune --method safegrad {train_args} --out outputs/hardened-safegrad || python -m training.harden_safetune --method safegrad {train_args} --amp bf16 --out outputs/hardened-safegrad",
+         "python -m training.harden_safetune --method plain {train_args} --out outputs/hardened-plain || python -m training.harden_safetune --method plain {train_args} --amp bf16 --out outputs/hardened-plain"],
         ["python -m training.guard_data --traces runs/inputs/{src}/train/base_train.jsonl",
-         "python -m training.harden_safetune --method plain {guard_args} --data data/sft/guard_train.jsonl --val data/sft/guard_val.jsonl --out outputs/guard"],
+         "python -m training.harden_safetune --method plain {guard_args} --data data/sft/guard_train.jsonl --val data/sft/guard_val.jsonl --out outputs/guard || python -m training.harden_safetune --method plain {guard_args} --amp bf16 --data data/sft/guard_train.jsonl --val data/sft/guard_val.jsonl --out outputs/guard"],
     ],
     "final": [
         ["mkdir -p runs/final && cp runs/inputs/{src}/final/base*_test.jsonl runs/final/ 2>/dev/null; true",
@@ -153,8 +153,8 @@ def main():
     ap.add_argument("--hf-user")
     ap.add_argument("--from", dest="sources", nargs="*", default=[], help="run ids whose outputs this stage reads")
     ap.add_argument("--slug", help="cancel: kernel slug to delete")
-    ap.add_argument("--train-args", default=f"{QLORA} --batch-size 1 --max-len 1280 --epochs 2 --lr 2e-5")
-    ap.add_argument("--guard-args", default=f"{QLORA} --batch-size 1 --grad-accum 16 --max-len 1024 --epochs 2")
+    ap.add_argument("--train-args", default=f"{QLORA} --batch-size 1 --max-len 1536 --epochs 1 --lr 4e-5 --time-budget-min 170")
+    ap.add_argument("--guard-args", default=f"{QLORA} --batch-size 1 --grad-accum 16 --max-len 1024 --epochs 2 --time-budget-min 200")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 

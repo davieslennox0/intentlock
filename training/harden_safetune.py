@@ -77,6 +77,9 @@ def main():
                     help="gradient accumulation steps. SafeGrad does not support >1 (SafeTune raises); it is forced to 1 there")
     ap.add_argument("--longest-first", action="store_true", help="smoke tests: take the longest rows, to stress memory")
     ap.add_argument("--max-steps", type=int, default=-1)
+    ap.add_argument("--amp", choices=["auto", "fp16", "bf16"], default="auto",
+                    help="auto: bf16 on Ampere or newer, fp16 on older GPUs such as the T4 (where bf16 is emulated and slow)")
+    ap.add_argument("--time-budget-min", type=float, default=0, help="stop training after this many minutes (0 = no limit)")
     ap.add_argument("--rho", type=float, default=0.1, help="SafeGrad alignment weight (SafeTune docs: start at 0.1)")
     ap.add_argument("--safety-n", type=int, default=256, help="rows of the alignment (safety) set")
     ap.add_argument("--kl-reference", action="store_true",
@@ -99,6 +102,10 @@ def main():
     from safetune.runner.utils.model_utils import lora_wrap
 
     set_seed(a.seed)
+    amp = a.amp
+    if amp == "auto":
+        amp = "bf16" if (torch.cuda.is_available() and torch.cuda.get_device_capability(0)[0] >= 8) else "fp16"
+    amp_dtype = torch.bfloat16 if amp == "bf16" else torch.float16
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     tok = AutoTokenizer.from_pretrained(a.model)
@@ -109,9 +116,9 @@ def main():
     if a.load_in_4bit:
         from transformers import BitsAndBytesConfig
         kw["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
-                                                       bnb_4bit_compute_dtype=torch.bfloat16)
+                                                       bnb_4bit_compute_dtype=amp_dtype)
     elif torch.cuda.is_available():
-        kw["dtype"] = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        kw["dtype"] = amp_dtype
     model = AutoModelForCausalLM.from_pretrained(a.model, **kw)
     if a.load_in_4bit:
         from peft import prepare_model_for_kbit_training
@@ -128,7 +135,8 @@ def main():
     def prep(path):
         rows = load_rows(path)
         n_in = len(rows)
-        lens = [len(tok.apply_chat_template(r["messages"], tokenize=True)) for r in rows]
+        lens = [len(tok(tok.apply_chat_template(r["messages"], tokenize=False), add_special_tokens=False)["input_ids"])
+                for r in rows]
         if a.max_len:
             keep = [i for i, n in enumerate(lens) if n <= a.max_len]
             dropped[str(path)] = {"rows_in": n_in, "dropped_over_max_len": n_in - len(keep), "max_len": a.max_len,
@@ -150,7 +158,7 @@ def main():
         print("SafeGrad does not support gradient accumulation; using 1.")
         accum = 1
 
-    use_bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+    use_bf16 = torch.cuda.is_available() and amp == "bf16"
     args_kw = dict(
         output_dir=str(out / "trainer"), num_train_epochs=a.epochs,
         per_device_train_batch_size=a.batch_size, per_device_eval_batch_size=a.batch_size,
@@ -160,7 +168,7 @@ def main():
         eval_strategy="steps" if val_ds is not None else "no",
         eval_steps=max(10, int(a.epochs * len(train_ds) / (a.batch_size * accum)) // 8),
         save_strategy="no", report_to="none", seed=a.seed,
-        bf16=use_bf16, fp16=torch.cuda.is_available() and not use_bf16 and not a.load_in_4bit,
+        bf16=use_bf16, fp16=torch.cuda.is_available() and amp == "fp16",
     )
     collator = PadCollator(tok.pad_token_id)
     safety_info = None
@@ -184,6 +192,15 @@ def main():
                           eval_dataset=val_ds, data_collator=collator)
 
     t0 = time.time()
+    if a.time_budget_min:
+        from transformers import TrainerCallback
+
+        class Budget(TrainerCallback):
+            """Stop cleanly when the time budget is spent; the adapter is still saved."""
+            def on_step_end(self, args, state, control, **kwargs):
+                if time.time() - t0 > a.time_budget_min * 60:
+                    control.should_training_stop = True
+        trainer.add_callback(Budget())
     result = trainer.train()
     wall = time.time() - t0
     adapter_dir = out / "adapter"
@@ -194,7 +211,9 @@ def main():
     (out / "training_log.json").write_text(json.dumps(log, indent=2))
     run = {
         "method": a.method, "args": vars(a), "train_rows": len(train_ds), "length_cap": dropped,
-        "grad_accum_used": accum, "effective_batch": a.batch_size * accum,
+        "grad_accum_used": accum, "effective_batch": a.batch_size * accum, "amp": amp,
+        "planned_steps": int(a.epochs * len(train_ds) / (a.batch_size * accum)),
+        "stopped_by_time_budget": bool(a.time_budget_min and wall > a.time_budget_min * 60),
         "seconds_per_step": round(wall / max(1, trainer.state.global_step), 2), "steps": trainer.state.global_step,
         "lora": {"r": a.lora_r, "alpha": a.lora_alpha, "dropout": 0.05,
                  "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]},
