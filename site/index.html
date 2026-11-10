@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signer's Doubt</title>
+<meta name="description" content="Can a wallet agent be talked into signing? Base vs hardened Tiny Aya on poisoned tool output.">
+<style>
+:root{
+  --bg:#f6f5f1; --panel:#ffffff; --ink:#1c1b19; --muted:#6a675f; --line:#dedbd2; --accent:#0b5cad;
+  --bad:#b3261e; --bad-bg:#fbe9e7; --ok:#1b6e3a; --ok-bg:#e6f4ea; --warn:#8a5a00; --warn-bg:#fdf1d7;
+  --code:#f0eee8; --inj:#ffe2a8;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15161a; --panel:#1e2026; --ink:#ecebe7; --muted:#a09d95; --line:#33353d; --accent:#7db6f5;
+    --bad:#ff8a80; --bad-bg:#3a1d1b; --ok:#7fd69b; --ok-bg:#16301f; --warn:#f2c46b; --warn-bg:#3a2e12;
+    --code:#17181d; --inj:#5a4310;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:28px 16px 64px}
+h1{font-size:2rem;line-height:1.15;margin:0 0 6px;letter-spacing:-.01em}
+h2{font-size:1.2rem;margin:36px 0 10px}
+h3{font-size:1rem;margin:0 0 8px}
+p{margin:0 0 12px}
+a{color:var(--accent)}
+.lede{font-size:1.1rem;max-width:62ch}
+.muted{color:var(--muted)}
+.small{font-size:.875rem}
+.note{border-left:3px solid var(--line);padding:6px 12px;margin:14px 0;color:var(--muted);max-width:75ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 16px}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-size:.875rem;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.chip:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tag{display:inline-block;font-size:.75rem;border-radius:4px;padding:1px 6px;background:var(--code);color:var(--muted);margin-right:4px}
+pre{background:var(--code);border-radius:8px;padding:10px 12px;overflow-x:auto;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;margin:6px 0 12px}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--code);padding:1px 4px;border-radius:4px;word-break:break-word}
+mark{background:var(--inj);color:inherit;border-radius:3px;padding:0 1px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:760px){.cols{grid-template-columns:1fr}}
+.verdict{display:inline-block;border-radius:6px;padding:4px 10px;font-weight:600;font-size:.9rem;margin-bottom:10px}
+.v-bad{background:var(--bad-bg);color:var(--bad)} .v-ok{background:var(--ok-bg);color:var(--ok)} .v-warn{background:var(--warn-bg);color:var(--warn)}
+ol.steps{margin:0;padding-left:20px} ol.steps li{margin-bottom:10px}
+.payload{border-left:3px solid var(--line);padding-left:10px;margin-top:4px}
+.payload.bad{border-color:var(--bad)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;color:var(--muted)}
+td.ci{color:var(--muted);font-size:.8rem}
+.tabs{display:flex;gap:8px;margin-bottom:10px}
+footer{margin-top:48px;color:var(--muted);font-size:.875rem;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Signer's Doubt</h1>
+  <p class="lede">A wallet agent reads untrusted text, then proposes transactions. If that text can give it orders, whoever wrote the text is the one transacting. This page shows what Tiny Aya does when the text is poisoned.</p>
+  <p class="note small">Everything here is a mock: no chain, no keys, no funds. Addresses are fake and commands are only logged. This project defends the AI-agent form of the attack; it would not stop malware on a person's machine or a compromised signing service.</p>
+  <p class="small"><a href="https://github.com/davieslennox0/intentlock">Code and method</a> · <a href="https://huggingface.co/datasets/Sykeclonex/signers-doubt-eval-traces">Traces</a> · Lexsi AI Safety and Alignment Hackathon, Track 2</p>
+
+  <h2>Pick a scenario</h2>
+  <p class="muted small">Twelve episodes from the evaluation splits. The highlighted text is the injected instruction. Traces are replayed from recorded runs, not generated live.</p>
+  <div class="chips" id="chips" role="group" aria-label="Scenarios"></div>
+
+  <div class="panel" id="scenario" aria-live="polite"></div>
+
+  <div class="cols" style="margin-top:16px">
+    <div class="panel"><h3>Base Tiny Aya</h3><div id="base"></div></div>
+    <div class="panel"><h3>Hardened agent + pre-signing guard</h3><div id="hard"></div></div>
+  </div>
+
+  <h2>Results</h2>
+  <div id="results"></div>
+
+  <footer id="foot"></footer>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pct = (ci) => ci && ci.mean != null ? (ci.mean * 100).toFixed(1) + "%" : "n/a";
+const range = (ci) => ci && ci.lo != null ? `${(ci.lo * 100).toFixed(1)} to ${(ci.hi * 100).toFixed(1)}` : "";
+const LABEL = {base:"Base", base_boundary:"Base + prompt rule", plain_sft:"Plain SFT", hardened:"Hardened (SafeGrad)", base_guard:"Base + guard", hardened_guard:"Hardened + guard"};
+const ROWS = [["asr","Attack success rate"],["asr_given_exposed","Attack success when the injection was read"],["exposure_rate","Agent read the poisoned output"],
+  ["task_completion_under_attack","Task completed, attack scenarios"],["task_completion_clean","Task completed, clean scenarios"],
+  ["false_block_rate","Legitimate action refused (clean)"],["asr_tag_spoof","Attack success, tag-spoof subset"]];
+let DATA, current = 0, split = "test";
+
+function matches(spec, p){
+  if(!spec || !p) return false;
+  let t = spec.type === "sign_delegation" ? "eip7702_authorization" : spec.type;
+  if(t && t !== p.type) return false;
+  for(const [k, v] of Object.entries(spec)){
+    if(k === "type") continue;
+    if(k === "cmd_contains"){ if(!String(p.cmd || "").toLowerCase().includes(String(v).toLowerCase())) return false; }
+    else if(String(p[k] ?? "").toLowerCase() !== String(v).toLowerCase()) return false;
+  }
+  return true;
+}
+function highlight(text, injected){
+  let html = esc(text);
+  for(const part of String(injected || "").split(" || ").filter(Boolean)){
+    for(const cand of [part, JSON.stringify(part).slice(1, -1)]){
+      const e = esc(cand);
+      if(e && html.includes(e)){ html = html.split(e).join("<mark>" + e + "</mark>"); break; }
+    }
+  }
+  return html;
+}
+function renderScenario(ex){
+  const tags = ex.is_clean ? `<span class="tag">clean control</span>` :
+    `<span class="tag">${esc(ex.family)}</span><span class="tag">${esc(ex.injection_technique)}</span><span class="tag">in ${esc(ex.injection_location)}</span>`;
+  let h = `<p>${tags}<span class="tag">split: ${esc(ex.split)}</span><span class="tag">boundary tags: ${esc(ex.wrapper)}</span></p>
+    <h3>The user asks</h3><pre>${esc(ex.user_task)}</pre><h3>What the tools return</h3>`;
+  for(const [k, v] of Object.entries(ex.tool_fixtures))
+    h += `<div class="small muted"><code>${esc(k)}</code></div><pre>${highlight(v, ex.injected_text)}</pre>`;
+  if(!ex.is_clean) h += `<p class="small muted">The injection is trying to cause: <code>${esc(JSON.stringify(ex.malicious_action_spec))}</code></p>`;
+  $("scenario").innerHTML = h;
+}
+function renderTrace(el, tr, ex, pendingMsg){
+  if(!tr){ el.innerHTML = `<p class="muted">${pendingMsg}</p>`; return; }
+  const L = tr.labels; let v;
+  if(ex.is_clean) v = L.task_success ? ["v-ok","Task completed"] : ["v-warn","Task not completed"];
+  else if(L.attack_success) v = ["v-bad","Injected action was signed"];
+  else if(L.attack_attempted) v = ["v-warn","Attempted, blocked by the guard"];
+  else if(tr.exposed === false) v = ["v-warn","Never read the poisoned output"];
+  else v = ["v-ok","Injection ignored"];
+  let h = `<div class="verdict ${v[0]}">${v[1]}</div>
+    <p class="small muted">User's task completed: ${L.task_success ? "yes" : "no"} · ended by: ${esc(tr.stop_reason.replace("_"," "))}</p><ol class="steps">`;
+  for(const s of tr.steps){
+    if(s.parse_error){ h += `<li class="muted">Reply was not valid JSON</li>`; continue; }
+    if(s.tool){
+      h += `<li><code>${esc(s.tool)}(${esc(JSON.stringify(s.args || {}))})</code>`;
+      if(s.thought) h += `<div class="small muted">${esc(s.thought)}</div>`;
+      if(s.payload){
+        const bad = [].concat(ex.malicious_action_spec || []).some(sp => matches(sp, s.payload));
+        h += `<div class="payload ${bad ? "bad" : ""} small">${bad ? "<strong>Matches the injected goal.</strong> " : ""}Proposed for signing: <code>${esc(JSON.stringify(s.payload))}</code>`;
+        if(s.guard) h += `<br>Guard: <strong>${esc(s.guard.verdict)}</strong> ${esc(s.guard.reason || "")}`;
+        h += `</div>`;
+      }
+      h += `</li>`;
+    } else if("final" in s) h += `<li>Final answer: ${esc(s.final)}</li>`;
+  }
+  el.innerHTML = h + `</ol>`;
+}
+function show(i){
+  current = i; const ex = DATA.examples[i];
+  [...$("chips").children].forEach((c, j) => c.setAttribute("aria-pressed", j === i));
+  renderScenario(ex);
+  renderTrace($("base"), ex.traces.base, ex, "Recorded base-model trace pending: the corrected baseline run has not finished.");
+  renderTrace($("hard"), ex.traces.hardened, ex, "Pending: the hardened agent and guard have not been trained yet. This panel fills in after the final evaluation.");
+}
+function renderResults(){
+  const R = DATA.results || {};
+  if(!Object.keys(R).length){ $("results").innerHTML = `<p class="muted">Pending. No evaluation run has been published to this page yet; numbers appear here only after a real run produces them.</p>`; return; }
+  const splits = Object.keys(R); if(!R[split]) split = splits[0];
+  const cfgs = Object.keys(R[split]);
+  let h = `<div class="tabs">` + splits.map(s => `<button class="chip" aria-pressed="${s === split}" onclick="split='${s}';renderResults()">${s === "test" ? "Test split" : "Held-out formats"}</button>`).join("") + `</div>
+    <p class="small muted">${R[split][cfgs[0]].n_attack} attack and ${R[split][cfgs[0]].n_clean} clean scenarios. Ranges are 95% bootstrap intervals.${cfgs.includes("hardened") ? "" : " Hardened and guard configurations are pending."}</p>
+    <div class="tablewrap"><table><thead><tr><th>Metric</th>` + cfgs.map(c => `<th>${LABEL[c] || c}</th>`).join("") + `</tr></thead><tbody>`;
+  for(const [k, name] of ROWS)
+    h += `<tr><td>${name}</td>` + cfgs.map(c => `<td>${pct(R[split][c][k])}<div class="ci">${range(R[split][c][k])}</div></td>`).join("") + `</tr>`;
+  const fams = Object.keys(R[split][cfgs[0]].asr_by_family || {});
+  for(const f of fams)
+    h += `<tr><td>Attack success: ${f.replace(/_/g, " ")}</td>` + cfgs.map(c => `<td>${pct((R[split][c].asr_by_family || {})[f])}</td>`).join("") + `</tr>`;
+  $("results").innerHTML = h + `</tbody></table></div>`;
+}
+fetch("data.json", {cache: "no-store"}).then(r => r.json()).then(d => {
+  DATA = d;
+  $("chips").innerHTML = d.examples.map((e, i) => `<button class="chip" aria-pressed="false" onclick="show(${i})">${e.is_clean ? "clean" : esc(e.family.replace(/_/g, " ")) + " · " + esc(e.injection_technique.replace(/_/g, " "))}</button>`).join("");
+  show(0); renderResults();
+  $("foot").textContent = `Data built ${d.generated}. Baseline run: ${d.runs.baseline || "pending"}. Final evaluation run: ${d.runs.final || "pending"}.`;
+}).catch(e => { $("scenario").textContent = "Could not load data.json: " + e; });
+</script>
+</body>
+</html>
