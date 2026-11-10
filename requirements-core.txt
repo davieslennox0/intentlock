@@ -1,0 +1,5 @@
+# No-GPU subset: testbed, data generation, curation, metrics, AuditKIT scoring, unit tests.
+matplotlib
+pytest
+curatorkit @ git+https://github.com/Lexsi-Labs/CuratorKIT.git@d6f2e44edede9b78d5fe5189096f64d3ed798724
+auditkit @ git+https://github.com/Lexsi-Labs/AuditKIT.git@9da5838e61ef54d560a37605ddbcb19aceded9b3

@@ -1,0 +1,16 @@
+# Signer's Doubt. Python 3.12 (SafeTune needs >=3.12, CircuitKIT supports <=3.12).
+# The four Lexsi libraries are pinned to the commits this project was built and read against.
+torch>=2.7
+transformers>=5.15,<6
+peft>=0.6,<1
+accelerate>=0.24,<2
+datasets>=2.14,<6
+bitsandbytes>=0.41
+huggingface-hub>=1.5,<2
+matplotlib
+gradio>=5
+pytest
+curatorkit @ git+https://github.com/Lexsi-Labs/CuratorKIT.git@d6f2e44edede9b78d5fe5189096f64d3ed798724
+auditkit @ git+https://github.com/Lexsi-Labs/AuditKIT.git@9da5838e61ef54d560a37605ddbcb19aceded9b3
+safetune @ git+https://github.com/Lexsi-Labs/SafeTune.git@59a6cfa1383a229f4f3ca685819ebc557a103414
+circuitkit @ git+https://github.com/Lexsi-Labs/CircuitKIT.git@227fafdaf1ae78ac1de492da07d8173d16f8863c

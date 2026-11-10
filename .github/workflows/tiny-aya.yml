@@ -1,0 +1,101 @@
+# Runs Tiny Aya on a GitHub-hosted CPU runner (4 vCPU, 16 GB RAM, no GPU).
+# Needs the repository secret HF_TOKEN from an account that accepted the Tiny Aya licence.
+name: tiny-aya
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "smoke = Phase 0 checks for all four libraries; baseline = run the base agent"
+        type: choice
+        options: [smoke, baseline]
+        default: smoke
+      scenarios:
+        description: "baseline: scenario file"
+        default: data/seed/handwritten.jsonl
+      shards:
+        description: "baseline: number of parallel jobs (each up to ~5.5 h)"
+        default: "1"
+      limit:
+        description: "baseline: max scenarios (empty = all)"
+        default: ""
+env:
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  HF_HUB_DISABLE_PROGRESS_BARS: "1"
+  TOKENIZERS_PARALLELISM: "false"
+jobs:
+  smoke:
+    if: inputs.job == 'smoke'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [transformers, auditkit, curatorkit, safetune, circuitkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL; df -h /
+      - name: Add swap (fp32 Tiny Aya is 13.4 GB on a 16 GB runner)
+        run: |
+          sudo swapoff -a || true
+          sudo fallocate -l 12G /mnt/swapfile && sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile && sudo swapon /mnt/swapfile && free -g
+      - name: Install
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt 2>&1 | tee reports/pip_${{ matrix.check }}.log | tail -5
+          pip check 2>&1 | tee reports/pip_check_${{ matrix.check }}.log || true
+          pip freeze > reports/pip_freeze_${{ matrix.check }}.txt
+      - name: Phase 0 check
+        run: python scripts/phase0_smoke.py ${{ matrix.check }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase0-${{ matrix.check }}
+          path: |
+            reports/phase0/
+            reports/pip_*
+  shards:
+    if: inputs.job == 'baseline'
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.s.outputs.list }}
+    steps:
+      - id: s
+        run: echo "list=$(python3 -c "print(list(range(int('${{ inputs.shards }}'))))")" >> "$GITHUB_OUTPUT"
+  baseline:
+    if: inputs.job == 'baseline'
+    needs: shards
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.shards.outputs.list) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+      - run: |
+          sudo swapoff -a || true
+          sudo fallocate -l 12G /mnt/swapfile && sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile && sudo swapon /mnt/swapfile
+      - run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install "transformers>=5.15,<6" "peft>=0.6,<1" "accelerate>=0.24,<2" -r requirements-core.txt
+      - name: Run the base agent
+        run: |
+          python -m testbed.runner --scenarios "${{ inputs.scenarios }}" \
+            --out runs/ci/base_shard${{ matrix.shard }}.jsonl --config-name base \
+            --shard ${{ matrix.shard }}/${{ inputs.shards }} ${{ inputs.limit != '' && format('--limit {0}', inputs.limit) || '' }}
+          python -m eval.metrics --traces runs/ci/base_shard${{ matrix.shard }}.jsonl --out runs/ci/metrics_shard${{ matrix.shard }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: baseline-shard${{ matrix.shard }}
+          path: runs/ci/

@@ -70,9 +70,13 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--load-in-4bit", action="store_true")
+    ap.add_argument("--shard", default=None, help="i/n: run only every n-th scenario starting at i (for parallel CI jobs)")
     a = ap.parse_args()
 
     scenarios = load_jsonl(a.scenarios)[: a.limit]
+    if a.shard:
+        i, n = (int(x) for x in a.shard.split("/"))
+        scenarios = scenarios[i::n]
     guard = None
     hub = None
     if a.policy == "hf":

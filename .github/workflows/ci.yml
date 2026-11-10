@@ -1,0 +1,20 @@
+name: tests
+on:
+  push:
+  pull_request:
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-core.txt
+      - name: Unit tests (no model, no network calls from the testbed)
+        run: python -m pytest -q tests
+      - name: Regenerate and curate the dataset; fail if it drifts from the committed files
+        run: |
+          python -m data.generate
+          python -m data.curate --out /tmp/curated
+          for s in train test heldout_format; do cmp /tmp/curated/$s.jsonl data/curated/$s.jsonl; done

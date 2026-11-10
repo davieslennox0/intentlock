@@ -69,6 +69,9 @@ class ModelHub:
                 kw["dtype"] = getattr(torch, dtype)
             elif torch.cuda.is_available():
                 kw["dtype"] = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+            else:
+                kw["dtype"] = torch.float32      # bf16 on CPU is extremely slow
+                kw["low_cpu_mem_usage"] = True
             self.base = AutoModelForCausalLM.from_pretrained(model_id, **kw)
         self.base.eval()
         self.peft = None

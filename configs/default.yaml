@@ -1,0 +1,10 @@
+# Single place for the values every run uses. Scripts take these as CLI defaults.
+model: CohereLabs/tiny-aya-global
+seeds: {data: 7, eval: 0, eval_sampled: 1, training: 7}
+agent: {max_steps: 4, max_new_tokens: 220, temperature: 0.0, sampled_temperature: 0.7}
+wrappers: [default, alt, none]
+dataset: {attack_target: 800, clean_target: 300, splits: {train: 0.60, test: 0.25, heldout_format: 0.15}, minhash_threshold: 0.85}
+hardening: {method: safegrad, rho: 0.1, epochs: 2, batch_size: 2, lr: 1.0e-4, lora_r: 16, lora_alpha: 32, safety_rows: 256}
+guard: {epochs: 2, max_new_tokens: 40, fail_closed: true}
+interp: {fit_pairs: 160, layers: 4, steer_alpha: 4.0, eval_limit: 120}
+bootstrap: {resamples: 2000, alpha: 0.05}
