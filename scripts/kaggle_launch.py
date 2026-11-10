@@ -29,10 +29,13 @@ STAGES = {
     ],
     "train": [
         ["python -m training.build_sft",
-         "python -m training.harden_safetune --method safegrad --out outputs/hardened-safegrad --epochs 2",
-         "python -m training.harden_safetune --method plain --out outputs/hardened-plain --epochs 2"],
-        ["python -m training.guard_data --traces runs/train/base_train.jsonl",
-         "python -m training.harden_safetune --method plain --data data/sft/guard_train.jsonl --val data/sft/guard_val.jsonl --out outputs/guard --epochs 2"],
+         "python -m training.harden_safetune --method safegrad --out outputs/hardened-safegrad --load-in-4bit --epochs 2 --batch-size 2 || python -m training.harden_safetune --method safegrad --out outputs/hardened-safegrad --load-in-4bit --epochs 2 --batch-size 1",
+         "python -m training.harden_safetune --method plain --out outputs/hardened-plain --load-in-4bit --epochs 2 --batch-size 2 || python -m training.harden_safetune --method plain --out outputs/hardened-plain --load-in-4bit --epochs 2 --batch-size 1"],
+        [HAND,
+         "python -m eval.run_all --only base --splits train --runs runs/train --reports runs/train_reports",
+         "python -m training.guard_data --traces runs/train/base_train.jsonl",
+         "python -m training.harden_safetune --method plain --data data/sft/guard_train.jsonl --val data/sft/guard_val.jsonl --out outputs/guard --load-in-4bit --epochs 2 --batch-size 4 || python -m training.harden_safetune --method plain --data data/sft/guard_train.jsonl --val data/sft/guard_val.jsonl --out outputs/guard --load-in-4bit --epochs 2 --batch-size 2",
+         "python -m eval.run_all --only base base_boundary --reports reports"],
     ],
     "final": [
         ["python -m eval.run_all --agent-adapter outputs/hardened-safegrad/adapter --guard-adapter outputs/guard/adapter --plain-adapter outputs/hardened-plain/adapter --no-sampled --splits test --reports reports",
@@ -41,7 +44,7 @@ STAGES = {
          "python -m eval.capability --out reports/capability --adapter hardened=outputs/hardened-safegrad/adapter --adapter plain_sft=outputs/hardened-plain/adapter"],
     ],
     "interp": [
-        ["python -m interp.circuitkit_discover --n 24 --algorithm eap-ig --out reports/interp || echo 'CircuitKIT discovery failed; causal_eval falls back to probe-selected layers'",
+        ["CUDA_VISIBLE_DEVICES= timeout 10800 python -m interp.circuitkit_discover --n 16 --max-tokens 800 --algorithm eap --device cpu --dtype float32 --out reports/interp || echo 'CircuitKIT discovery failed or timed out; causal_eval falls back to probe-selected layers'",
          "python -m interp.causal_eval --limit 120 --out reports/interp"],
     ],
 }
@@ -121,6 +124,7 @@ def main():
     ap.add_argument("--hf-user", required=True)
     ap.add_argument("--commit", default=None, help="default: current HEAD (must be pushed)")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
     commit = a.commit or subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     code = JOB.format(stage=a.stage, lanes=STAGES[a.stage], hf_user=a.hf_user, commit=commit)
@@ -136,6 +140,10 @@ def main():
     if a.dry_run:
         print(code[-1700:])
         return
+    st = subprocess.run(["kaggle", "kernels", "status", meta["id"]], capture_output=True, text=True).stdout
+    if ("RUNNING" in st or "QUEUED" in st) and not a.force:
+        raise SystemExit(f"{meta['id']} is still running. Pushing does NOT cancel it; both would run and "
+                         "overwrite each other on the Hub. Stop it in the Kaggle UI first, or pass --force.")
     subprocess.run(["kaggle", "kernels", "push", "-p", str(d)], check=True)
 
 

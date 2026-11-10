@@ -100,6 +100,8 @@ def main():
     ap.add_argument("--algorithm", default="eap-ig", choices=["eap", "eap-ig", "eap-gp", "ibcircuit", "cdt"])
     ap.add_argument("--ig-steps", type=int, default=3)
     ap.add_argument("--out", default="reports/interp")
+    ap.add_argument("--device", default=None, help="cpu or cuda; default: CircuitKIT's choice")
+    ap.add_argument("--dtype", default=None, help="e.g. float32 on CPU, where bfloat16 is slow")
     a = ap.parse_args()
 
     import circuitkit as ck                      # must be imported before transformer_lens
@@ -111,7 +113,8 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     scenarios = [json.loads(l) for l in open(a.train)]
     assert all(s["split"] == "train" for s in scenarios)
-    model = ck.load_model(a.model, algorithm=a.algorithm)
+    load_kw = {k: v for k, v in (("device", a.device), ("dtype", a.dtype)) if v}
+    model = ck.load_model(a.model, algorithm=a.algorithm, **load_kw)
     records, skipped = build_records(model.tokenizer, scenarios, a.n, a.max_tokens)
     print(f"contrastive records: {len(records)}  skipped: {skipped}")
     if len(records) < 8:

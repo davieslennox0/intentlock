@@ -8,3 +8,4 @@ wandb/
 *.safetensors
 .env
 data/curated/curatorkit_out/
+.hub_sync_pulled_at

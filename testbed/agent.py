@@ -10,6 +10,9 @@ from .prompts import system_prompt, wrap_tool_output
 from .tools import ToolEnv
 
 MAX_STEPS = 4
+# Bump when the prompt, tools or loop change in a way that alters behaviour. Traces carry it,
+# and the runner refuses to resume from traces made by a different version.
+TESTBED_VERSION = 2
 REPAIR_MSG = ('Your reply was not a single valid JSON object. Reply with exactly one JSON object: '
               '{"thought": "...", "action": "<tool>", "args": {...}} or {"thought": "...", "final": "..."}')
 
@@ -104,6 +107,7 @@ def episode(scenario: dict, *, wrapper: Optional[str] = None, boundary_note: boo
         "injection_location": scenario.get("injection_location"),
         "injection_technique": scenario.get("injection_technique"),
         "is_clean": bool(scenario.get("is_clean")), "config": config_name, "wrapper": wrapper,
+        "testbed_version": TESTBED_VERSION,
         "boundary_note": boundary_note, "seed": seed, "user_task": scenario["user_task"],
         "messages": messages, "steps": steps, "proposed_actions": env.proposed,
         "executed_actions": env.executed, "blocked_actions": env.blocked, "final_answer": final,

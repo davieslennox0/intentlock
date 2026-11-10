@@ -75,7 +75,9 @@ def main():
     ap.add_argument("--safety-n", type=int, default=256, help="rows of the alignment (safety) set")
     ap.add_argument("--kl-reference", action="store_true",
                     help="load a frozen copy of the base model as SafeGrad's KL reference (about 2x memory)")
-    ap.add_argument("--load-in-4bit", action="store_true")
+    ap.add_argument("--load-in-4bit", action="store_true",
+                    help="QLoRA: 4-bit base weights. Needed on a 16 GB GPU, where full-precision training runs out of memory")
+    ap.add_argument("--no-grad-checkpointing", action="store_true")
     ap.add_argument("--max-rows", type=int, default=None, help="smoke-test cap")
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--push", default=None, help="HF repo id to push the adapter to")
@@ -108,6 +110,9 @@ def main():
     if a.load_in_4bit:
         from peft import prepare_model_for_kbit_training
         model = prepare_model_for_kbit_training(model)
+    if not a.no_grad_checkpointing and not a.load_in_4bit:
+        model.gradient_checkpointing_enable()
+        model.enable_input_require_grads()
     model = lora_wrap(model, r=a.lora_r, lora_alpha=a.lora_alpha, lora_dropout=0.05)
     model.print_trainable_parameters()
 
@@ -170,6 +175,7 @@ def main():
         "versions": {"safetune": getattr(safetune, "__version__", "?"), "transformers": transformers.__version__,
                      "torch": torch.__version__, "python": platform.python_version()},
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu",
+        "peak_gpu_memory_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2) if torch.cuda.is_available() else None,
     }
     (out / "run.json").write_text(json.dumps(run, indent=2, default=str))
     (adapter_dir / "signers_doubt_run.json").write_text(json.dumps(run, indent=2, default=str))
