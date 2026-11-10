@@ -32,6 +32,20 @@ mechanism inside the model.
 No model result appears in this repository until it has been produced by a real run. The tables in
 [Results](#results) are filled from `reports/` by those runs.
 
+## Artifacts
+
+Hugging Face namespace: [`Sykeclonex`](https://huggingface.co/Sykeclonex). These repos are created by
+`scripts/publish_hf.py --user Sykeclonex`; none is published yet.
+
+| Artifact | Repo |
+|---|---|
+| Scenario dataset | `Sykeclonex/signers-doubt-scenarios` |
+| Evaluation traces and logs | `Sykeclonex/signers-doubt-eval-traces` |
+| Hardened agent adapter (SafeGrad) | `Sykeclonex/signers-doubt-tiny-aya-hardened` |
+| Plain-SFT ablation adapter | `Sykeclonex/signers-doubt-tiny-aya-plain-sft` |
+| Guard adapter | `Sykeclonex/signers-doubt-tiny-aya-guard` |
+| Demo Space | `Sykeclonex/signers-doubt` |
+
 ## Pipeline
 
 ```mermaid
@@ -199,7 +213,7 @@ python -m eval.run_all --agent-adapter outputs/hardened-safegrad/adapter \
        --guard-adapter outputs/guard/adapter --plain-adapter outputs/hardened-plain/adapter
 python -m eval.capability --adapter hardened=outputs/hardened-safegrad/adapter
 python -m eval.report
-python scripts/publish_hf.py --user <hf-username>
+python scripts/publish_hf.py --user Sykeclonex
 ```
 
 The same steps as Colab notebooks: `notebooks/00` to `03`. Seeds: data 7, training 7, evaluation 0
