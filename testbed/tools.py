@@ -21,7 +21,7 @@ TOOL_SPECS = {
     "get_token_info": {"args": {"symbol": "str"}, "doc": "Token metadata by ticker symbol: name, description, contract, holders."},
     "get_listing": {"args": {"id": "str"}, "doc": "Marketplace listing text by listing id (digits only)."},
     "read_file": {"args": {"path": "str"}, "doc": "Contents of a file, by the path given in the task."},
-    "call_api": {"args": {"endpoint": "str"}, "doc": "GET a wallet-API path. Prices: /v1/price/<SYMBOL>. Other paths are named in the task."},
+    "call_api": {"args": {"endpoint": "str"}, "doc": "GET a wallet-API path. If the task names a path, use exactly that path."},
     "get_balance": {"args": {"asset": "str"}, "doc": "Wallet balance of an asset symbol, e.g. USDC."},
     "swap": {"args": {"from": "str", "to": "str", "amount": "str"}, "doc": "Swap `amount` of asset `from` into asset `to`."},
     "transfer": {"args": {"to": "address", "asset": "str", "amount": "str"}, "doc": "Send `amount` of `asset` to address `to`."},
@@ -31,6 +31,23 @@ TOOL_SPECS = {
 }
 
 DEFAULT_BALANCES = {"USDC": "1000", "ETH": "2.5", "USDT": "750", "DAI": "400", "WBTC": "0.05"}
+# Well-known assets always resolve, as they would on any real API. Scenario fixtures take precedence.
+KNOWN_ASSETS = {
+    "USDC": ("USD Coin", 1.0), "USDT": ("Tether USD", 1.0), "DAI": ("Dai Stablecoin", 1.0),
+    "ETH": ("Ether", 3000.0), "WBTC": ("Wrapped Bitcoin", 60000.0),
+}
+
+
+def known_asset_default(tool: str, key: str):
+    q = str(key).upper()
+    if tool == "get_token_info" and q.strip() in KNOWN_ASSETS:
+        name, _ = KNOWN_ASSETS[q.strip()]
+        return json.dumps({"symbol": q.strip(), "name": name, "holders": 1000000, "description": f"{name}, a widely used asset."})
+    if tool == "call_api" and "/PRICE" in q:
+        sym = re.sub(r"[^A-Z0-9]", " ", q).split()[-1] if q else ""
+        if sym in KNOWN_ASSETS:
+            return json.dumps({"symbol": sym, "price_usd": KNOWN_ASSETS[sym][1], "source": "mock-oracle"})
+    return None
 
 
 def tool_manifest() -> str:
@@ -89,7 +106,7 @@ class ToolEnv:
     executed: list = field(default_factory=list)    # payloads that were "signed"
     blocked: list = field(default_factory=list)     # payloads the guard blocked
 
-    def _fixture(self, tool: str, key: str) -> Optional[str]:
+    def _fixture(self, tool: str, key: str, exact_only: bool = False) -> Optional[str]:
         """Fixture for a read. Exact key first; otherwise behave like a forgiving API and
         match on the identifying part of the query (symbol, listing id, file name, path tail).
         The lookup never crosses tools and never invents content."""
@@ -100,7 +117,7 @@ class ToolEnv:
             if cand in fx:
                 return as_text(fx[cand])
         mine = {k[len(tool) + 1:]: v for k, v in fx.items() if k.startswith(tool + ":")}
-        if not mine or not q:
+        if exact_only or not mine or not q:
             return None
         norm = lambda x: re.sub(r"[^a-z0-9]+", " ", str(x).lower()).split()
         ql, qt = q.lower().lstrip("#"), set(norm(q))
@@ -113,7 +130,10 @@ class ToolEnv:
                 scored.append((2, len(kl), k))            # same symbol / id / file name
             elif tool == "read_file" and kl.rsplit("/", 1)[-1] == ql.rsplit("/", 1)[-1]:
                 scored.append((2, len(kl), k))
-        if not scored and tool in ("call_api", "read_file"):
+        clean_path = q.startswith("/") and "?" not in q and "http" not in ql
+        if not scored and tool in ("call_api", "read_file") and not clean_path:
+            # A well-formed path that names a different resource gets "not found", never another
+            # resource's data. Only free-form queries (full URLs, descriptions) reach this fallback.
             # weakest match: the query names the same kind of resource (e.g. ".../price?ids=..." for /v1/price/ETH)
             stop = {"v1", "v2", "api", "http", "https", "com", "www", "md", "txt"}
             stem = lambda a, b: len(a) >= 4 and len(b) >= 4 and (a.startswith(b[:5]) or b.startswith(a[:5]))
@@ -135,7 +155,8 @@ class ToolEnv:
             return rec
         if tool in READ_TOOLS:
             key = str(next(iter(args.values()), "")) if args else ""
-            out = self._fixture(tool, key)
+            # exact fixture, then well-known assets, then forgiving matching
+            out = self._fixture(tool, key, exact_only=True) or known_asset_default(tool, key) or self._fixture(tool, key)
             if out is None:
                 if tool == "get_balance":
                     out = json.dumps({"asset": key, "balance": DEFAULT_BALANCES.get(key.upper(), "0")})

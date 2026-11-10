@@ -12,7 +12,7 @@ import platform
 import time
 from pathlib import Path
 
-from .agent import TESTBED_VERSION, episode, run_episode
+from .agent import CODE_COMMIT, TESTBED_HASH, episode, run_episode
 from .policies import DEFAULT_MODEL, OraclePolicy
 
 
@@ -36,9 +36,9 @@ def run_many(scenarios, policy_factory, *, out=None, config_name="base", wrapper
     done = {}
     if out and resume and os.path.exists(out):
         rows = load_jsonl(out)
-        done = {r["scenario_id"]: r for r in rows if r.get("testbed_version") == TESTBED_VERSION}
+        done = {r["scenario_id"]: r for r in rows if r.get("testbed_hash") == TESTBED_HASH}
         if len(done) != len(rows):          # stale or duplicate rows: rewrite the file without them
-            print(f"[{config_name}] dropping {len(rows) - len(done)} stale trace(s) from {out}", flush=True)
+            print(f"[{config_name}] dropping {len(rows) - len(done)} trace(s) from other code versions in {out}", flush=True)
             write_jsonl(out, list(done.values()))
     if out:
         Path(out).parent.mkdir(parents=True, exist_ok=True)
@@ -128,7 +128,8 @@ def main():
     traces = run_many(scenarios, factory, out=a.out, config_name=a.config_name, wrapper=a.wrapper,
                       boundary_note=a.boundary_note, guard=guard, seed=a.seed, batch_size=a.batch_size)
     meta = {"config_name": a.config_name, "args": vars(a), "n": len(traces),
-            "wall_seconds": round(time.time() - t0, 1), "python": platform.python_version()}
+            "wall_seconds": round(time.time() - t0, 1), "python": platform.python_version(),
+            "testbed_hash": TESTBED_HASH, "code_commit": CODE_COMMIT}
     if a.policy == "hf":
         meta["tokens_per_second"] = {r: round(hub.tokens_per_second(r), 2) for r in hub.stats}
         meta["device"] = str(hub.device)

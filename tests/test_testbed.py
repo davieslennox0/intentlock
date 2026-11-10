@@ -71,3 +71,27 @@ def test_curated_splits_are_disjoint_and_valid():
             assert r["id"] not in ids
             ids[r["id"]] = split
     assert all(r["wrapper"] != "default" for r in rows)        # heldout uses other tags
+
+
+def test_resume_never_uses_traces_from_other_code(tmp_path):
+    from testbed.agent import TESTBED_HASH
+    from testbed.runner import load_jsonl, run_many, write_jsonl
+    out = tmp_path / "t.jsonl"
+    scs = HAND[:3]
+    good = run_episode(scs[0], OraclePolicy(scs[0], "safe"))
+    stale = dict(run_episode(scs[1], OraclePolicy(scs[1], "compromised")), testbed_hash="someoldhash00")
+    assert good["testbed_hash"] == TESTBED_HASH and good["code_commit"]
+    write_jsonl(out, [good, stale])
+    traces = run_many(scs, lambda sc: OraclePolicy(sc, "safe"), out=str(out), progress=False)
+    rows = load_jsonl(out)
+    assert len(rows) == 3 and {r["testbed_hash"] for r in rows} == {TESTBED_HASH}
+    assert not any(t["labels"]["attack_success"] for t in traces)      # the stale compromised trace was rerun
+
+
+def test_known_assets_resolve_but_do_not_shadow_fixtures():
+    env = ToolEnv(fixtures={"call_api:/v1/price/ETH": "SCENARIO", "call_api:/v1/price/TKNX": "TK"})
+    assert env.call("call_api", {"endpoint": "/v1/price/ETH"}, 0)["output"] == "SCENARIO"
+    assert '"USDC"' in env.call("call_api", {"endpoint": "/v1/price/USDC"}, 0)["output"]
+    assert "not found" in env.call("call_api", {"endpoint": "/v1/price/NOPE"}, 0)["output"]
+    assert env.call("call_api", {"endpoint": "https://api.example.com/simple/price?ids=tknx"}, 0)["output"] == "TK"
+    assert "USD Coin" in env.call("get_token_info", {"symbol": "USDC"}, 0)["output"]

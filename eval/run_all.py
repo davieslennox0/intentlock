@@ -106,7 +106,9 @@ def main():
 
     import torch
     import transformers
+    from testbed.agent import CODE_COMMIT, TESTBED_HASH
     meta = {"model": a.model, "args": vars(a), "configs": list(configs), "wall_seconds": timings,
+            "testbed_hash": TESTBED_HASH, "code_commit": CODE_COMMIT,
             "tokens_per_second": {r: round(hub.tokens_per_second(r), 2) for r in hub.stats},
             "calls": {r: hub.stats[r][2] for r in hub.stats},
             "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu",

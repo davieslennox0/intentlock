@@ -70,7 +70,13 @@ def main():
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--lora-r", type=int, default=16)
     ap.add_argument("--lora-alpha", type=int, default=32)
-    ap.add_argument("--max-len", type=int, default=None, help="default: sized by SafeTune, capped at 2048")
+    ap.add_argument("--max-len", type=int, default=None,
+                    help="drop rows whose templated length exceeds this many tokens (reported in run.json); "
+                         "default: no cap, sized by SafeTune up to 2048")
+    ap.add_argument("--grad-accum", type=int, default=1,
+                    help="gradient accumulation steps. SafeGrad does not support >1 (SafeTune raises); it is forced to 1 there")
+    ap.add_argument("--longest-first", action="store_true", help="smoke tests: take the longest rows, to stress memory")
+    ap.add_argument("--max-steps", type=int, default=-1)
     ap.add_argument("--rho", type=float, default=0.1, help="SafeGrad alignment weight (SafeTune docs: start at 0.1)")
     ap.add_argument("--safety-n", type=int, default=256, help="rows of the alignment (safety) set")
     ap.add_argument("--kl-reference", action="store_true",
@@ -113,27 +119,46 @@ def main():
     if not a.no_grad_checkpointing and not a.load_in_4bit:
         model.gradient_checkpointing_enable()
         model.enable_input_require_grads()
-    model = lora_wrap(model, r=a.lora_r, lora_alpha=a.lora_alpha, lora_dropout=0.05)
+    model = lora_wrap(model, r=a.lora_r, lora_alpha=a.lora_alpha, lora_dropout=0.05,
+                      target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"])
     model.print_trainable_parameters()
 
+    dropped = {}
+
     def prep(path):
-        rows = load_rows(path)[: a.max_rows]
+        rows = load_rows(path)
+        n_in = len(rows)
+        lens = [len(tok.apply_chat_template(r["messages"], tokenize=True)) for r in rows]
+        if a.max_len:
+            keep = [i for i, n in enumerate(lens) if n <= a.max_len]
+            dropped[str(path)] = {"rows_in": n_in, "dropped_over_max_len": n_in - len(keep), "max_len": a.max_len,
+                                  "longest_row_tokens": max(lens)}
+            rows, lens = [rows[i] for i in keep], [lens[i] for i in keep]
+        if a.longest_first:
+            order = sorted(range(len(rows)), key=lambda i: -lens[i])
+            rows = [rows[i] for i in order]
+        rows = rows[: a.max_rows]
         ds = Dataset.from_list([{"messages": r["messages"]} for r in rows])
         return strip_padding(tokenize_dataset(ds, tok, max_len=a.max_len))
 
     train_ds = prep(a.data)
     val_ds = prep(a.val) if a.val and Path(a.val).exists() else None
     lens = [len(x) for x in train_ds["input_ids"]]
-    print(f"train rows={len(train_ds)} tokens: max={max(lens)} mean={sum(lens) / len(lens):.0f}")
+    print(f"train rows={len(train_ds)} tokens: max={max(lens)} mean={sum(lens) / len(lens):.0f} | length cap: {json.dumps(dropped)}")
+    accum = a.grad_accum
+    if a.method == "safegrad" and accum != 1:
+        print("SafeGrad does not support gradient accumulation; using 1.")
+        accum = 1
 
     use_bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
     args_kw = dict(
         output_dir=str(out / "trainer"), num_train_epochs=a.epochs,
         per_device_train_batch_size=a.batch_size, per_device_eval_batch_size=a.batch_size,
-        gradient_accumulation_steps=1,          # SafeGrad requires 1
+        gradient_accumulation_steps=accum, max_steps=a.max_steps,
         learning_rate=a.lr, lr_scheduler_type="cosine",
-        warmup_steps=max(1, int(0.05 * a.epochs * len(train_ds) / a.batch_size)), logging_steps=10,
-        eval_strategy="steps" if val_ds is not None else "no", eval_steps=100,
+        warmup_steps=max(1, int(0.05 * a.epochs * len(train_ds) / (a.batch_size * accum))), logging_steps=10,
+        eval_strategy="steps" if val_ds is not None else "no",
+        eval_steps=max(10, int(a.epochs * len(train_ds) / (a.batch_size * accum)) // 8),
         save_strategy="no", report_to="none", seed=a.seed,
         bf16=use_bf16, fp16=torch.cuda.is_available() and not use_bf16 and not a.load_in_4bit,
     )
@@ -168,7 +193,11 @@ def main():
     log = trainer.state.log_history
     (out / "training_log.json").write_text(json.dumps(log, indent=2))
     run = {
-        "method": a.method, "args": vars(a), "train_rows": len(train_ds),
+        "method": a.method, "args": vars(a), "train_rows": len(train_ds), "length_cap": dropped,
+        "grad_accum_used": accum, "effective_batch": a.batch_size * accum,
+        "seconds_per_step": round(wall / max(1, trainer.state.global_step), 2), "steps": trainer.state.global_step,
+        "lora": {"r": a.lora_r, "alpha": a.lora_alpha, "dropout": 0.05,
+                 "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]},
         "val_rows": len(val_ds) if val_ds is not None else 0, "safety_set": safety_info,
         "train_loss": result.training_loss, "wall_seconds": round(wall, 1),
         "final_eval_loss": next((x["eval_loss"] for x in reversed(log) if "eval_loss" in x), None),
@@ -193,7 +222,8 @@ def main():
         fig.tight_layout(); fig.savefig(out / "training_curve.png", dpi=150)
     except Exception as e:                       # plotting must never lose a finished run
         print("plot skipped:", e)
-    print(json.dumps({k: run[k] for k in ("method", "train_rows", "train_loss", "final_eval_loss", "wall_seconds")}, indent=2))
+    print(json.dumps({k: run[k] for k in ("method", "train_rows", "length_cap", "effective_batch", "steps", "seconds_per_step",
+                                          "peak_gpu_memory_gb", "train_loss", "final_eval_loss", "wall_seconds")}, indent=2))
 
     if a.push:
         from safetune import push_to_hub
