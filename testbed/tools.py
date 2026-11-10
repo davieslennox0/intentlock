@@ -7,6 +7,7 @@ in-memory log. `run_command` NEVER executes anything.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
@@ -17,11 +18,11 @@ WRITE_TOOLS = ["swap", "transfer", "approve", "sign_delegation", "run_command"]
 ALL_TOOLS = READ_TOOLS + WRITE_TOOLS
 
 TOOL_SPECS = {
-    "get_token_info": {"args": {"symbol": "str"}, "doc": "Token metadata: name, description, contract, holders."},
-    "get_listing": {"args": {"id": "str"}, "doc": "Marketplace listing text."},
-    "read_file": {"args": {"path": "str"}, "doc": "Contents of a file or README."},
-    "call_api": {"args": {"endpoint": "str"}, "doc": "GET a JSON API endpoint."},
-    "get_balance": {"args": {"asset": "str"}, "doc": "Wallet balance of an asset."},
+    "get_token_info": {"args": {"symbol": "str"}, "doc": "Token metadata by ticker symbol: name, description, contract, holders."},
+    "get_listing": {"args": {"id": "str"}, "doc": "Marketplace listing text by listing id (digits only)."},
+    "read_file": {"args": {"path": "str"}, "doc": "Contents of a file, by the path given in the task."},
+    "call_api": {"args": {"endpoint": "str"}, "doc": "GET a wallet-API path. Prices: /v1/price/<SYMBOL>. Other paths are named in the task."},
+    "get_balance": {"args": {"asset": "str"}, "doc": "Wallet balance of an asset symbol, e.g. USDC."},
     "swap": {"args": {"from": "str", "to": "str", "amount": "str"}, "doc": "Swap `amount` of asset `from` into asset `to`."},
     "transfer": {"args": {"to": "address", "asset": "str", "amount": "str"}, "doc": "Send `amount` of `asset` to address `to`."},
     "approve": {"args": {"spender": "address", "asset": "str", "amount": "str"}, "doc": "Approve `spender` to spend `amount` of `asset` (amount may be \"unlimited\")."},
@@ -89,11 +90,39 @@ class ToolEnv:
     blocked: list = field(default_factory=list)     # payloads the guard blocked
 
     def _fixture(self, tool: str, key: str) -> Optional[str]:
+        """Fixture for a read. Exact key first; otherwise behave like a forgiving API and
+        match on the identifying part of the query (symbol, listing id, file name, path tail).
+        The lookup never crosses tools and never invents content."""
         fx = self.fixtures or {}
-        for cand in (f"{tool}:{key}", f"{tool}:{str(key).upper()}", f"{tool}:{str(key).lower()}", f"{tool}:*"):
+        as_text = lambda v: v if isinstance(v, str) else json.dumps(v)
+        q = str(key).strip()
+        for cand in (f"{tool}:{q}", f"{tool}:{q.upper()}", f"{tool}:{q.lower()}", f"{tool}:*"):
             if cand in fx:
-                v = fx[cand]
-                return v if isinstance(v, str) else json.dumps(v)
+                return as_text(fx[cand])
+        mine = {k[len(tool) + 1:]: v for k, v in fx.items() if k.startswith(tool + ":")}
+        if not mine or not q:
+            return None
+        norm = lambda x: re.sub(r"[^a-z0-9]+", " ", str(x).lower()).split()
+        ql, qt = q.lower().lstrip("#"), set(norm(q))
+        scored = []
+        for k, v in mine.items():
+            kl, kt = k.lower(), norm(k)
+            if kl in ql or ql in kl:                      # path/URL contains the key, or the reverse
+                scored.append((3, len(kl), k))
+            elif kt and kt[-1] in qt and not kt[-1].isdigit() or (kt and kt[-1].isdigit() and kt[-1] in qt):
+                scored.append((2, len(kl), k))            # same symbol / id / file name
+            elif tool == "read_file" and kl.rsplit("/", 1)[-1] == ql.rsplit("/", 1)[-1]:
+                scored.append((2, len(kl), k))
+        if not scored and tool in ("call_api", "read_file"):
+            # weakest match: the query names the same kind of resource (e.g. ".../price?ids=..." for /v1/price/ETH)
+            stop = {"v1", "v2", "api", "http", "https", "com", "www", "md", "txt"}
+            stem = lambda a, b: len(a) >= 4 and len(b) >= 4 and (a.startswith(b[:5]) or b.startswith(a[:5]))
+            for k in mine:
+                n = sum(1 for a in set(norm(k)) - stop for b in qt - stop if stem(a, b))
+                if n:
+                    scored.append((1, n, k))
+        if scored:
+            return as_text(mine[max(scored)[2]])
         return None
 
     def call(self, tool: str, args: dict, step: int, context: Optional[dict] = None) -> dict:

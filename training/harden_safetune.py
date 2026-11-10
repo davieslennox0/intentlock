@@ -126,7 +126,8 @@ def main():
         output_dir=str(out / "trainer"), num_train_epochs=a.epochs,
         per_device_train_batch_size=a.batch_size, per_device_eval_batch_size=a.batch_size,
         gradient_accumulation_steps=1,          # SafeGrad requires 1
-        learning_rate=a.lr, lr_scheduler_type="cosine", warmup_ratio=0.05, logging_steps=10,
+        learning_rate=a.lr, lr_scheduler_type="cosine",
+        warmup_steps=max(1, int(0.05 * a.epochs * len(train_ds) / a.batch_size)), logging_steps=10,
         eval_strategy="steps" if val_ds is not None else "no", eval_steps=100,
         save_strategy="no", report_to="none", seed=a.seed,
         bf16=use_bf16, fp16=torch.cuda.is_available() and not use_bf16 and not a.load_in_4bit,

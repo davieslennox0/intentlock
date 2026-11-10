@@ -45,6 +45,7 @@ def main():
     ap.add_argument("--sample-temperature", type=float, default=0.7)
     ap.add_argument("--load-in-4bit", action="store_true")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--batch-size", type=int, default=8, help="episodes advanced per generation call")
     a = ap.parse_args()
 
     from testbed.policies import HFPolicy, ModelHub
@@ -83,7 +84,7 @@ def main():
             path = f"{a.runs}/{name}_{split}.jsonl"
             t0 = time.time()
             traces = run_many(scenarios, lambda sc: pol, out=path, config_name=name,
-                              boundary_note=note, guard=g, seed=seed)
+                              boundary_note=note, guard=g, seed=seed, batch_size=a.batch_size)
             timings[f"{name}_{split}"] = round(time.time() - t0, 1)
             summaries[name] = summarise(traces, by_id)
             if split != "train":

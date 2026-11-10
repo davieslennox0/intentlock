@@ -68,7 +68,8 @@ class ModelHub:
             elif dtype != "auto":
                 kw["dtype"] = getattr(torch, dtype)
             elif torch.cuda.is_available():
-                kw["dtype"] = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+                # bf16 is emulated (slow) before Ampere, e.g. on a T4: use fp16 there
+                kw["dtype"] = torch.bfloat16 if torch.cuda.get_device_capability(0)[0] >= 8 else torch.float16
             else:
                 kw["dtype"] = torch.float32      # bf16 on CPU is extremely slow
                 kw["low_cpu_mem_usage"] = True
@@ -141,6 +142,46 @@ class ModelHub:
         st[0] += int(new.shape[0]); st[1] += time.perf_counter() - t0; st[2] += 1
         return self.tok.decode(new, skip_special_tokens=True).strip()
 
+    def generate_batch(self, batch, adapter: Optional[str] = None, max_new_tokens: int = 220,
+                       temperature: float = 0.0, seed: int = 0, role: str = "agent") -> list[str]:
+        """Generate for several conversations at once (left-padded)."""
+        import contextlib
+        import time
+        torch = self.torch
+        fold = (lambda m: m) if self.system_ok else self._fold_system
+        try:
+            texts = [self.tok.apply_chat_template(fold(m), tokenize=False, add_generation_prompt=True) for m in batch]
+        except Exception:
+            if not self.system_ok:
+                raise
+            self.system_ok = False
+            return self.generate_batch(batch, adapter, max_new_tokens, temperature, seed, role)
+        side, self.tok.padding_side = self.tok.padding_side, "left"
+        if self.tok.pad_token_id is None:
+            self.tok.pad_token = self.tok.eos_token
+        enc = self.tok(texts, return_tensors="pt", padding=True, add_special_tokens=False).to(self.device)
+        self.tok.padding_side = side
+        kw = {"max_new_tokens": max_new_tokens, "pad_token_id": self.tok.pad_token_id}
+        if temperature and temperature > 0:
+            torch.manual_seed(seed)
+            kw.update(do_sample=True, temperature=temperature, top_p=0.95)
+        else:
+            kw.update(do_sample=False)
+        if self.peft is None:
+            model, ctx = self.base, contextlib.nullcontext()
+        elif adapter is None:
+            model, ctx = self.peft, self.peft.disable_adapter()
+        else:
+            self.peft.set_adapter(adapter)
+            model, ctx = self.peft, contextlib.nullcontext()
+        t0 = time.perf_counter()
+        with torch.no_grad(), ctx:
+            out = model.generate(**enc, **kw)
+        new = out[:, enc["input_ids"].shape[1]:]
+        st = self.stats.setdefault(role, [0, 0.0, 0])
+        st[0] += int((new != self.tok.pad_token_id).sum()); st[1] += time.perf_counter() - t0; st[2] += len(batch)
+        return [self.tok.decode(row, skip_special_tokens=True).strip() for row in new]
+
     def tokens_per_second(self, role: str = "agent") -> float:
         t, s, _ = self.stats.get(role, [0, 0.0, 0])
         return t / s if s else 0.0
@@ -157,3 +198,7 @@ class HFPolicy:
     def generate(self, messages) -> str:
         return self.hub.generate(messages, adapter=self.adapter, max_new_tokens=self.max_new_tokens,
                                  temperature=self.temperature, seed=self.seed, role="agent")
+
+    def generate_batch(self, batch) -> list[str]:
+        return self.hub.generate_batch(batch, adapter=self.adapter, max_new_tokens=self.max_new_tokens,
+                                       temperature=self.temperature, seed=self.seed, role="agent")

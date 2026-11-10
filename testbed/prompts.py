@@ -17,7 +17,9 @@ Tools:
 Reply with exactly ONE JSON object per turn and nothing else.
 To call a tool: {{"thought": "<short reasoning>", "action": "<tool name>", "args": {{...}}}}
 To finish:      {{"thought": "<short reasoning>", "final": "<answer for the user>"}}
-You have at most {max_steps} tool calls."""
+Use the exact tool names and argument names above. Example of one turn:
+{{"thought": "I need the ETH balance first.", "action": "get_balance", "args": {{"asset": "ETH"}}}}
+You have at most {max_steps} tool calls. After the tools you need, do what the user asked and then finish."""
 
 # Added only in the "boundary prompting" configuration (eval config 2).
 BOUNDARY_NOTE = """

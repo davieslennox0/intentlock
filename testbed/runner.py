@@ -12,7 +12,7 @@ import platform
 import time
 from pathlib import Path
 
-from .agent import run_episode
+from .agent import episode, run_episode
 from .policies import DEFAULT_MODEL, OraclePolicy
 
 
@@ -29,26 +29,51 @@ def write_jsonl(path, rows):
 
 
 def run_many(scenarios, policy_factory, *, out=None, config_name="base", wrapper=None,
-             boundary_note=False, guard=None, seed=0, progress=True, resume=True):
+             boundary_note=False, guard=None, seed=0, progress=True, resume=True, batch_size=1):
+    """Run scenarios and append traces to `out`. With batch_size > 1 and a policy that has
+    `generate_batch`, that many episodes advance together, one generation call per round.
+    `latency_s.per_step` is then the wall time of the shared call (see `batch_size` in the trace)."""
     done = {}
     if out and resume and os.path.exists(out):
         done = {r["scenario_id"]: r for r in load_jsonl(out)}
-    Path(out).parent.mkdir(parents=True, exist_ok=True) if out else None
+    if out:
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
     fh = open(out, "a") if out else None
     traces = list(done.values())
-    for i, sc in enumerate(scenarios):
-        if sc["id"] in done:
-            continue
-        tr = run_episode(sc, policy_factory(sc), wrapper=wrapper, boundary_note=boundary_note,
-                         guard=guard, config_name=config_name, seed=seed)
+    todo = [sc for sc in scenarios if sc["id"] not in done]
+    kw = dict(wrapper=wrapper, boundary_note=boundary_note, guard=guard, config_name=config_name, seed=seed)
+
+    def finish(tr, bs):
+        tr["batch_size"] = bs
         traces.append(tr)
         if fh:
             fh.write(json.dumps(tr, ensure_ascii=False) + "\n")
             fh.flush()
-        if progress and (i + 1) % 20 == 0:
-            n_att = sum(1 for t in traces if not t["is_clean"])
-            asr = sum(t["labels"]["attack_success"] for t in traces if not t["is_clean"]) / max(1, n_att)
-            print(f"[{config_name}] {i + 1}/{len(scenarios)}  running ASR={asr:.2%}", flush=True)
+        if progress and len(traces) % 20 == 0:
+            att = [t for t in traces if not t["is_clean"]]
+            asr = sum(t["labels"]["attack_success"] for t in att) / max(1, len(att))
+            print(f"[{config_name}] {len(traces)}/{len(scenarios)}  running ASR={asr:.2%}", flush=True)
+
+    policy = policy_factory(todo[0]) if todo else None
+    if batch_size > 1 and hasattr(policy, "generate_batch"):
+        queue, active = list(todo), []           # active: [generator, pending messages]
+        while queue or active:
+            while queue and len(active) < batch_size:
+                g = episode(queue.pop(0), **kw)
+                active.append([g, next(g)])
+            t0 = time.perf_counter()
+            replies = policy.generate_batch([m for _, m in active])
+            dt = time.perf_counter() - t0
+            nxt = []
+            for (g, _), raw in zip(active, replies):
+                try:
+                    nxt.append([g, g.send((raw, dt))])
+                except StopIteration as stop:
+                    finish(stop.value, len(active))
+            active = nxt
+    else:
+        for sc in todo:
+            finish(run_episode(sc, policy_factory(sc), **kw), 1)
     if fh:
         fh.close()
     return traces
@@ -70,6 +95,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--load-in-4bit", action="store_true")
+    ap.add_argument("--batch-size", type=int, default=1)
     ap.add_argument("--shard", default=None, help="i/n: run only every n-th scenario starting at i (for parallel CI jobs)")
     a = ap.parse_args()
 
@@ -96,7 +122,7 @@ def main():
 
     t0 = time.time()
     traces = run_many(scenarios, factory, out=a.out, config_name=a.config_name, wrapper=a.wrapper,
-                      boundary_note=a.boundary_note, guard=guard, seed=a.seed)
+                      boundary_note=a.boundary_note, guard=guard, seed=a.seed, batch_size=a.batch_size)
     meta = {"config_name": a.config_name, "args": vars(a), "n": len(traces),
             "wall_seconds": round(time.time() - t0, 1), "python": platform.python_version()}
     if a.policy == "hf":

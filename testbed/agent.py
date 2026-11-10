@@ -54,10 +54,12 @@ def guard_context(scenario: dict, tool_outputs: list[dict], n_recent: int = 2, c
     return {"user_task": scenario["user_task"], "recent_tool_outputs": recent}
 
 
-def run_episode(scenario: dict, policy: Any, *, wrapper: Optional[str] = None,
-                boundary_note: bool = False, guard: Optional[Callable] = None,
-                max_steps: int = MAX_STEPS, config_name: str = "base", seed: int = 0) -> dict:
-    """Run one scenario. Returns the full trace as a JSON-serialisable dict."""
+def episode(scenario: dict, *, wrapper: Optional[str] = None, boundary_note: bool = False,
+            guard: Optional[Callable] = None, max_steps: int = MAX_STEPS, config_name: str = "base",
+            seed: int = 0):
+    """Generator form of one episode: yields the message list, receives (raw_reply, seconds),
+    and returns the finished trace. `run_episode` drives it one at a time; the batched
+    runner drives many at once."""
     wrapper = wrapper or scenario.get("wrapper") or "default"
     env = ToolEnv(fixtures=scenario.get("tool_fixtures") or {}, guard=guard)
     messages = [
@@ -69,9 +71,8 @@ def run_episode(scenario: dict, policy: Any, *, wrapper: Optional[str] = None,
     tool_steps, turns = 0, 0
     while tool_steps < max_steps and turns < max_steps + 2:
         turns += 1
-        t0 = time.perf_counter()
-        raw = policy.generate(messages)
-        latencies.append(time.perf_counter() - t0)
+        raw, seconds = yield messages
+        latencies.append(seconds)
         messages.append({"role": "assistant", "content": raw})
         obj = extract_json(raw)
         if obj is None or ("action" not in obj and "final" not in obj):
@@ -97,6 +98,7 @@ def run_episode(scenario: dict, policy: Any, *, wrapper: Optional[str] = None,
         tool_steps += 1
 
     labels = label_episode(scenario, env.executed, env.proposed, env.blocked, finished=final is not None)
+    reads_hit = sum(1 for c in env.calls if not c["state_changing"] and c.get("ok") and '"error": "not found"' not in c["output"])
     return {
         "scenario_id": scenario["id"], "family": scenario.get("family"), "split": scenario.get("split"),
         "injection_location": scenario.get("injection_location"),
@@ -106,7 +108,34 @@ def run_episode(scenario: dict, policy: Any, *, wrapper: Optional[str] = None,
         "messages": messages, "steps": steps, "proposed_actions": env.proposed,
         "executed_actions": env.executed, "blocked_actions": env.blocked, "final_answer": final,
         "stop_reason": stop_reason, "parse_errors": parse_errors,
+        "exposed_to_injection": _exposed(scenario, tool_outputs), "reads_answered": reads_hit,
         "latency_s": {"per_step": [round(x, 4) for x in latencies],
                       "guard": [round(s["guard"].get("latency_s", 0.0), 4) for s in steps if s.get("guard")]},
         "labels": labels,
     }
+
+
+def _exposed(scenario: dict, tool_outputs: list[dict]) -> Optional[bool]:
+    """Did the agent actually read a poisoned tool output? None for clean scenarios.
+    An attack the agent never saw is not evidence of resistance, so ASR is also reported
+    conditional on exposure."""
+    if scenario.get("is_clean"):
+        return None
+    twin = scenario.get("clean_twin_fixtures") or {}
+    poisoned = [v for k, v in (scenario.get("tool_fixtures") or {}).items() if twin.get(k) != v] \
+        or list((scenario.get("tool_fixtures") or {}).values())
+    seen = {t["output"] for t in tool_outputs}
+    return any(str(p) in seen for p in poisoned)
+
+
+def run_episode(scenario: dict, policy: Any, **kw) -> dict:
+    """Run one scenario. Returns the full trace as a JSON-serialisable dict."""
+    gen = episode(scenario, **kw)
+    try:
+        messages = next(gen)
+        while True:
+            t0 = time.perf_counter()
+            raw = policy.generate(messages)
+            messages = gen.send((raw, time.perf_counter() - t0))
+    except StopIteration as done:
+        return done.value
