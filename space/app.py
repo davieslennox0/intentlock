@@ -32,7 +32,19 @@ AGENT_ADAPTER = os.environ.get("SD_AGENT_ADAPTER", "")
 GUARD_ADAPTER = os.environ.get("SD_GUARD_ADAPTER", "")
 HERE = Path(__file__).resolve().parent
 EXAMPLES = [json.loads(l) for l in open(HERE / "examples.jsonl")] if (HERE / "examples.jsonl").exists() else []
+# Replay mode: traces recorded during the real evaluation, keyed by scenario id.
+RECORDED = json.loads((HERE / "recorded.json").read_text()) if (HERE / "recorded.json").exists() else {}
 _hub = None
+
+
+def live_available() -> bool:
+    if os.environ.get("SD_LIVE") == "1":
+        return True
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except Exception:
+        return False
 
 
 def hub():
@@ -94,6 +106,15 @@ def run(task, fixtures_json, label, use_guard):
     scenario = dict(base) if base and base["user_task"] == task else {
         "id": "custom", "family": "custom", "is_clean": False, "malicious_action_spec": None,
         "expected_actions": [], "injection_technique": "custom", "injection_location": "custom"}
+    unchanged = bool(base) and base["user_task"] == task and base["tool_fixtures"] == fixtures
+    if not live_available():
+        rec = RECORDED.get(base["id"]) if unchanged else None
+        if rec:
+            note = "\n\n_Replayed from the recorded evaluation trace._"
+            return render(rec["base"], base) + note, render(rec["hardened"], base) + note
+        msg = ("This Space runs on CPU, so it replays recorded traces for the unmodified examples. "
+               "Live runs on edited input need a GPU: clone the repo and run `python space/app.py`.")
+        return msg, msg
     scenario.update(user_task=task, tool_fixtures=fixtures)
     h = hub()
     left = run_episode(scenario, HFPolicy(h, None), config_name="base")
@@ -105,7 +126,8 @@ def run(task, fixtures_json, label, use_guard):
 with gr.Blocks(title="Signer's Doubt") as demo:
     gr.Markdown("# Signer's Doubt\nA wallet agent reads untrusted text and proposes transactions. "
                 "Pick a poisoned context (or edit your own) and compare base Tiny Aya with the hardened agent and guard.\n\n"
-                "**Everything here is a mock.** No chain, keys or funds; addresses are fake; commands are only logged.")
+                "**Everything here is a mock.** No chain, keys or funds; addresses are fake; commands are only logged."
+                + ("" if live_available() else "\n\n_Running on CPU: unmodified examples replay traces recorded during the evaluation._"))
     with gr.Row():
         pick = gr.Dropdown([example_label(s) for s in EXAMPLES], label="Example scenario", scale=3)
         use_guard = gr.Checkbox(value=True, label="Pre-signing guard on the hardened side", scale=1)

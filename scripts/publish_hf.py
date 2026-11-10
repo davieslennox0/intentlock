@@ -138,6 +138,20 @@ def main():
             t = Path(t)
             for f in ("app.py", "requirements.txt", "README.md", "examples.jsonl"):
                 shutil.copy(ROOT / "space" / f, t / f)
+            # Recorded traces for the examples, so the free CPU Space can replay them.
+            ids = {json.loads(l)["id"] for l in open(ROOT / "space/examples.jsonl")}
+            rec = {}
+            for side, cfgs in (("base", ["base"]), ("hardened", ["hardened_guard", "hardened"])):
+                for cfg in cfgs:
+                    for split in ("test", "heldout_format"):
+                        f = ROOT / f"runs/final/{cfg}_{split}.jsonl"
+                        for l in (open(f) if f.exists() else []):
+                            tr = json.loads(l)
+                            if tr["scenario_id"] in ids:
+                                rec.setdefault(tr["scenario_id"], {}).setdefault(side, tr)
+            rec = {k: v for k, v in rec.items() if len(v) == 2}
+            (t / "recorded.json").write_text(json.dumps(rec))
+            print(f"space: recorded traces for {len(rec)}/{len(ids)} examples")
             shutil.copytree(ROOT / "testbed", t / "testbed", ignore=shutil.ignore_patterns("__pycache__"))
             (t / "training").mkdir()
             (t / "training/__init__.py").write_text("")
