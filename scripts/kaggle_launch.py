@@ -28,6 +28,7 @@ HAND = ("python -m testbed.runner --scenarios data/seed/handwritten.jsonl --out 
 SMOKE_TRAIN = [
     f"python -m training.harden_safetune --method safegrad {QLORA} --batch-size 1 --max-len 1024 --longest-first --max-rows 12 --max-steps 12 --safety-n 16 --val '' --out runs/smoke_train/safegrad_1024",
     f"python -m training.harden_safetune --method safegrad {QLORA} --batch-size 1 --max-len 1280 --longest-first --max-rows 12 --max-steps 12 --safety-n 16 --val '' --out runs/smoke_train/safegrad_1280",
+    f"python -m training.harden_safetune --method safegrad {QLORA} --batch-size 1 --max-len 1536 --longest-first --max-rows 12 --max-steps 12 --safety-n 16 --val '' --out runs/smoke_train/safegrad_1536",
     f"python -m training.harden_safetune --method plain {QLORA} --batch-size 1 --grad-accum 16 --max-len 1280 --longest-first --max-rows 32 --max-steps 2 --val '' --out runs/smoke_train/plain_1280_accum16",
     "rm -rf runs/smoke_train/*/adapter runs/smoke_train/*/trainer",
 ]
