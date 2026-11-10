@@ -1,0 +1,79 @@
+{
+  "pipeline_config_hash": "219268664e181c2a",
+  "run_timestamp": "2026-11-10T06:05:51.442266Z",
+  "source_files": [],
+  "stage_counts": {
+    "JSONLReader": {
+      "output_count": 1430,
+      "rejected_count": 0
+    },
+    "SchemaGate": {
+      "input_count": 1430,
+      "output_count": 1430,
+      "probe_recovered": 0,
+      "rejected_count": 0
+    },
+    "ExactDeduplicator": {
+      "input_count": 1430,
+      "output_count": 1412
+    },
+    "MinHashDeduplicator": {
+      "input_count": 1412,
+      "output_count": 1356
+    },
+    "TextCleaner": {
+      "input_count": 1356,
+      "output_count": 1356
+    },
+    "AlpacaExporter": {
+      "exported_count": 1356
+    }
+  },
+  "rejected_breakdown": {},
+  "dedup_stats": {
+    "near_duplicates_removed": 56,
+    "surviving_count": 1356
+  },
+  "minhash_threshold": 0.85,
+  "sampler_stats": null,
+  "token_stats": {
+    "total_prompt_tokens": 0,
+    "total_completion_tokens": 0,
+    "total_tokens": 0
+  },
+  "wall_clock_seconds": 16.314,
+  "tool_versions": {
+    "curatorkit": "0.1.21",
+    "python": "3.13.5"
+  },
+  "diversity_stats": null,
+  "diagnostic_stats": null,
+  "diagnostic_files": [],
+  "provenance": {
+    "schema": "lexsi.provenance/1",
+    "library": "curatorkit",
+    "version": "0.1.21",
+    "git_sha": null,
+    "created_at": "2026-11-10T06:05:51Z",
+    "base_model": null,
+    "method": "curate",
+    "inputs": [
+      {
+        "kind": "dataset",
+        "ref": "data/curated/flattened.jsonl",
+        "config": null,
+        "provenance": null
+      }
+    ],
+    "params": {
+      "generator_model": null,
+      "judge_model": null,
+      "grpo_scoring_model": null,
+      "export_formats": [
+        "alpaca"
+      ],
+      "output_split": null,
+      "pipeline_config_hash": "219268664e181c2a"
+    }
+  }
+}

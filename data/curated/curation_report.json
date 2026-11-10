@@ -1,0 +1,80 @@
+{
+  "raw": 1430,
+  "curatorkit_stage_counts": {
+    "JSONLReader": {
+      "output_count": 1430,
+      "rejected_count": 0
+    },
+    "SchemaGate": {
+      "input_count": 1430,
+      "output_count": 1430,
+      "probe_recovered": 0,
+      "rejected_count": 0
+    },
+    "ExactDeduplicator": {
+      "input_count": 1430,
+      "output_count": 1412
+    },
+    "MinHashDeduplicator": {
+      "input_count": 1412,
+      "output_count": 1356
+    },
+    "TextCleaner": {
+      "input_count": 1356,
+      "output_count": 1356
+    },
+    "AlpacaExporter": {
+      "exported_count": 1356
+    }
+  },
+  "curatorkit_version": "0.1.21",
+  "after_curatorkit": 1356,
+  "consistency_rejected": 0,
+  "consistency_reasons": {},
+  "leak_removed": 2,
+  "heldout_templates_seen_in_train": 0,
+  "final": 1099,
+  "final_attack": 799,
+  "final_clean": 300,
+  "by_family_split": {
+    "binance_signing/heldout_format": 24,
+    "binance_signing/test": 41,
+    "binance_signing/train": 98,
+    "clean/heldout_format": 45,
+    "clean/test": 75,
+    "clean/train": 180,
+    "contagious_interview/heldout_format": 16,
+    "contagious_interview/test": 27,
+    "contagious_interview/train": 65,
+    "split_payload/heldout_format": 18,
+    "split_payload/test": 30,
+    "split_payload/train": 73,
+    "wallet_injection/heldout_format": 61,
+    "wallet_injection/test": 102,
+    "wallet_injection/train": 244
+  },
+  "by_technique": {
+    "fake_system_note": 150,
+    "authority": 172,
+    "tag_spoof": 175,
+    "urgency": 181,
+    "split_across_outputs": 45,
+    "encoded_base64": 43,
+    "encoded_hex": 33,
+    "none": 300
+  },
+  "by_location": {
+    "api_json": 303,
+    "token_metadata": 192,
+    "listing": 120,
+    "agent_message": 23,
+    "readme": 116,
+    "multi": 45,
+    "none": 300
+  },
+  "by_wrapper": {
+    "default": 935,
+    "none": 100,
+    "alt": 64
+  }
+}
