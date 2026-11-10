@@ -175,7 +175,7 @@ _Pending. These sections are filled from `reports/` once the runs exist._
 Python 3.12. The four Lexsi libraries are pinned to exact commits in `requirements.txt`.
 
 ```bash
-git clone https://github.com/davieslennox0/signers-doubt && cd signers-doubt
+git clone https://github.com/davieslennox0/intentlock && cd intentlock
 
 # No GPU: tests, dataset, scoring
 pip install -r requirements-core.txt

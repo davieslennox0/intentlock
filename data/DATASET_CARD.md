@@ -20,7 +20,7 @@ arrive inside tool output (token metadata, marketplace listings, API JSON, READM
 messages) instead of from its user. 799 are attacks, 300 are clean.
 
 Built for the Lexsi AI Safety and Alignment Hackathon, Track 2. Code, testbed and results:
-<https://github.com/davieslennox0/signers-doubt>.
+<https://github.com/davieslennox0/intentlock>.
 
 ## What one scenario contains
 

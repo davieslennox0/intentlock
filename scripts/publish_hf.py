@@ -29,7 +29,7 @@ datasets: [{user}/signers-doubt-scenarios]
 
 LoRA adapter for [`{base}`](https://huggingface.co/{base}), built for **Signer's Doubt** (Lexsi AI
 Safety and Alignment Hackathon, Track 2). Code and full results:
-<https://github.com/davieslennox0/signers-doubt>.
+<https://github.com/davieslennox0/intentlock>.
 
 ## Training
 
@@ -100,7 +100,7 @@ def main():
         card = ("---\nlicense: cc-by-4.0\ntags: [ai-safety, prompt-injection, agents, eval-logs]\n---\n\n"
                 "# Signer's Doubt: evaluation traces and logs\n\nFull agent traces (messages, tool calls, proposed and executed "
                 "actions, guard verdicts, labels), AuditKIT reports, training logs and interpretability results for "
-                f"[Signer's Doubt](https://github.com/davieslennox0/signers-doubt). Scenarios: `{u}/signers-doubt-scenarios`.\n\n"
+                f"[Signer's Doubt](https://github.com/davieslennox0/intentlock). Scenarios: `{u}/signers-doubt-scenarios`.\n\n"
                 "`runs/final/<config>_<split>.jsonl` holds one JSON trace per scenario. `reports/` holds the result tables, "
                 "plots, AuditKIT outputs, capability benchmark runs and `run_meta.json` (hardware, versions, throughput).\n")
         with tempfile.TemporaryDirectory() as t:

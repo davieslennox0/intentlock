@@ -2,12 +2,12 @@
 import json
 from pathlib import Path
 
-REPO = "https://github.com/davieslennox0/signers-doubt.git"
+REPO = "https://github.com/davieslennox0/intentlock.git"
 SETUP = [
     ("md", "### Setup\nRuntime → Change runtime type → **T4 GPU** (or better). Accept the Tiny Aya licence at "
            "https://huggingface.co/CohereLabs/tiny-aya-global first: the weights are gated."),
     ("code", "!nvidia-smi --query-gpu=name,memory.total --format=csv || echo 'NO GPU: switch the runtime to a GPU'"),
-    ("code", f"import os\nif not os.path.exists('signers-doubt'):\n    !git clone -q {REPO}\n%cd signers-doubt\n"
+    ("code", f"import os\nif not os.path.exists('intentlock'):\n    !git clone -q {REPO}\n%cd intentlock\n"
              "!pip uninstall -y -q torchao            # SafeTune's Colab note\n"
              "!pip install -q -r requirements.txt 2>&1 | tail -3\n!pip check | head -20"),
     ("code", "from huggingface_hub import login, whoami\nlogin()        # token with read access to Tiny Aya and write access to your namespace\n"
