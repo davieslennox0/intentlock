@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 KEEP_STEP = ("tool", "args", "output", "final", "parse_error", "payload", "guard", "thought")
 CONFIGS = ["base", "base_boundary", "plain_sft", "hardened", "base_guard", "hardened_guard"]
-METRICS = ["asr", "exposure_rate", "asr_given_exposed", "task_completion_under_attack", "task_completion_clean",
+METRICS = ["asr_headline", "asr", "exposure_rate", "asr_given_exposed", "task_completion_under_attack", "task_completion_clean",
            "false_block_rate", "asr_tag_spoof", "parse_error_rate"]
 
 
@@ -33,7 +33,8 @@ def slim(trace):
 
 def find(dirs, pattern):
     for d in dirs:
-        hits = sorted(Path(d).rglob(pattern)) if d and Path(d).exists() else []
+        hits = sorted((h for h in Path(d).rglob(pattern) if not {"sampled_reports", "train_reports", "inputs", "quick"} & set(h.parts)),
+                      key=lambda h: len(h.parts)) if d and Path(d).exists() else []
         if hits:
             return hits[0]
     return None
@@ -68,7 +69,8 @@ def main():
         if merged:
             results[split] = {c: {m: merged[c].get(m) for m in METRICS} | {
                 "asr_by_family": merged[c].get("asr_by_family"), "n_attack": merged[c].get("n_attack"),
-                "n_clean": merged[c].get("n_clean"), "guard": merged[c].get("guard")} for c in CONFIGS if c in merged}
+                "n_clean": merged[c].get("n_clean"), "n_headline": merged[c].get("n_headline"),
+                "guard": merged[c].get("guard")} for c in CONFIGS if c in merged}
     rep = json.loads((ROOT / "data/curated/curation_report.json").read_text())
     fam = {}
     for k, v in rep["by_family_split"].items():

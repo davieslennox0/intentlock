@@ -26,7 +26,7 @@ from pathlib import Path
 from testbed.runner import load_jsonl, run_many
 
 from . import auditkit_bridge
-from .metrics import markdown_table, summarise
+from .metrics import markdown_table, summarise, verdict_table
 
 
 def main():
@@ -78,7 +78,7 @@ def main():
     for split in a.splits:
         scenarios = load_jsonl(f"{a.data_dir}/{split}.jsonl")[: a.limit]
         by_id = {s["id"]: s for s in scenarios}
-        summaries = {}
+        summaries, all_traces = {}, {}
         for name, (adapter, note, g, temp, seed) in configs.items():
             pol = HFPolicy(hub, adapter=adapter, temperature=temp, seed=seed)
             path = f"{a.runs}/{name}_{split}.jsonl"
@@ -87,6 +87,7 @@ def main():
                               boundary_note=note, guard=g, seed=seed, batch_size=a.batch_size)
             timings[f"{name}_{split}"] = round(time.time() - t0, 1)
             summaries[name] = summarise(traces, by_id)
+            all_traces[name] = traces
             if split != "train":
                 try:
                     res = auditkit_bridge.run(traces, by_id, f"{name}_{split}")
@@ -102,6 +103,11 @@ def main():
         Path(a.reports).mkdir(parents=True, exist_ok=True)
         (Path(a.reports) / f"results_{split}.md").write_text(f"## Results on `{split}` (n={len(scenarios)})\n\n{md}\n")
         (Path(a.reports) / f"results_{split}.json").write_text(json.dumps(summaries, indent=2))
+        verdicts, vmd = verdict_table(all_traces)
+        if verdicts:
+            (Path(a.reports) / f"verdicts_{split}.json").write_text(json.dumps(verdicts, indent=2))
+            (Path(a.reports) / f"verdicts_{split}.md").write_text(f"## Improvement verdicts on `{split}`\n\n{vmd}\n")
+            md += "\n\n" + vmd
         print(f"\n## {split}\n{md}")
 
     import torch

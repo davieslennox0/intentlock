@@ -340,9 +340,11 @@ const pct = (ci) => ci && ci.mean != null ? (ci.mean * 100).toFixed(1) + "%" : "
 const rng = (ci) => ci && ci.lo != null ? `${(ci.lo * 100).toFixed(1)} to ${(ci.hi * 100).toFixed(1)}` : "";
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const LABEL = {base:"Base", base_boundary:"Base + prompt rule", plain_sft:"Plain fine-tune", hardened:"Hardened (SafeGrad)", base_guard:"Base + guard", hardened_guard:"Hardened + guard"};
-const ROWS = [["asr","Attack success rate"],["asr_given_exposed","Attack success when the injection was read"],["exposure_rate","Agent read the poisoned output"],
-  ["task_completion_under_attack","Task completed, attack scenarios"],["task_completion_clean","Task completed, clean scenarios"],
-  ["false_block_rate","Legitimate action refused (clean)"],["asr_tag_spoof","Attack success, tag-spoof subset"]];
+const ROWS = [["asr_headline","Attack success rate (headline)",1],["task_completion_clean","Clean tasks completed",1],
+  ["false_block_rate","Legitimate action refused, clean tasks",1],["asr","Attack success, all attack scenarios"],
+  ["asr_given_exposed","Attack success when the injection was read"],["exposure_rate","Agent read the poisoned output"],
+  ["task_completion_under_attack","Task completed, attack scenarios"],["asr_tag_spoof","Attack success, tag-spoof subset"]];
+const HEAD = (r) => r.asr_headline || r.asr;
 const FAMILY = {wallet_injection:["Wallet injections","Transfers to an attacker, unlimited approvals, swapped payment recipients."],
   binance_signing:["Signing patterns","Unrequested account delegations, batches across nonces, full-balance sweeps."],
   contagious_interview:["Poisoned assignments","A take-home README that says: run this script, print your keys."],
@@ -446,9 +448,9 @@ function renderMeasure(){
 function renderChart(){
   const R = (DATA.results || {})[split], el = $("chart");
   if(!R){ $("chartsub").textContent = ""; el.innerHTML = `<div class="pending">Pending. Numbers appear here only after a real evaluation run produces them.</div>`; return; }
-  const cfgs = Object.keys(R), max = Math.max(.25, ...cfgs.map(c => (R[c].asr.hi ?? R[c].asr.mean))) , top = Math.ceil(max * 20) / 20;
-  $("chartsub").textContent = `Share of ${R[cfgs[0]].n_attack} attack scenarios on the ${split === "test" ? "test split" : "held-out formats"} where the injected action was signed. Lower is better. Whiskers are 95% bootstrap intervals.`;
-  el.innerHTML = cfgs.map(c => { const a = R[c].asr; return `<div class="row" data-tip="${esc(LABEL[c] || c)}: ${pct(a)} (${rng(a)}). Among episodes that read the injection: ${pct(R[c].asr_given_exposed)}.">
+  const cfgs = Object.keys(R), max = Math.max(.25, ...cfgs.map(c => (HEAD(R[c]).hi ?? HEAD(R[c]).mean))) , top = Math.ceil(max * 20) / 20;
+  $("chartsub").textContent = `Share of ${R[cfgs[0]].n_headline || R[cfgs[0]].n_attack} attack scenarios on the ${split === "test" ? "test split (the primary result)" : "held-out formats (a generalisation check)"} where the injected action was signed. Lower is better. Whiskers are 95% bootstrap intervals. Base64 and hex payloads are left out of this headline: the base model never acts on them.`;
+  el.innerHTML = cfgs.map(c => { const a = HEAD(R[c]); return `<div class="row" data-tip="${esc(LABEL[c] || c)}: ${pct(a)} (${rng(a)}). Among episodes that read the injection: ${pct(R[c].asr_given_exposed)}.">
       <div class="name">${LABEL[c] || c}</div>
       <div class="track"><div class="bar" data-w="${a.mean / top * 100}"></div>${a.lo != null ? `<div class="ci" style="left:${a.lo / top * 100}%;width:${(a.hi - a.lo) / top * 100}%"></div>` : ""}</div>
       <div class="val">${pct(a)}<span>${rng(a)}</span></div></div>`; }).join("") +
@@ -465,9 +467,9 @@ function renderResults(){
   if(!R[split]) split = Object.keys(R)[0];
   const cfgs = Object.keys(R[split]);
   let h = `<div class="tabs">` + Object.keys(R).map(s => `<button class="chip" aria-pressed="${s === split}" data-split="${s}">${s === "test" ? "Test split" : "Held-out formats"}</button>`).join("") + `</div>
-    <p class="small muted">${R[split][cfgs[0]].n_attack} attack and ${R[split][cfgs[0]].n_clean} clean scenarios. Ranges under each figure are 95% bootstrap intervals.${cfgs.includes("hardened") ? "" : " The hardened and guard columns are pending."}</p>
+    <p class="small muted" style="max-width:none">${split === "test" ? "Test split: the primary result." : "Held-out formats: a generalisation check, with wider intervals."} ${R[split][cfgs[0]].n_attack} attack and ${R[split][cfgs[0]].n_clean} clean scenarios. Ranges under each figure are 95% bootstrap intervals. A configuration counts as an improvement only if headline attack success drops and refusals of legitimate actions do not rise beyond the interval.${cfgs.includes("hardened") ? "" : " The hardened and guard columns are pending."}</p>
     <div class="tablewrap"><table><thead><tr><th>Measure</th>` + cfgs.map(c => `<th>${LABEL[c] || c}</th>`).join("") + `</tr></thead><tbody>`;
-  for(const [k, name] of ROWS) h += `<tr><td>${name}</td>` + cfgs.map(c => `<td>${pct(R[split][c][k])}<span class="r">${rng(R[split][c][k])}</span></td>`).join("") + `</tr>`;
+  for(const [k, name, primary] of ROWS) h += `<tr><td>${primary ? `<span class="tag" style="--c:var(--amber);margin:0 8px 0 0">primary</span>` : ""}${name}</td>` + cfgs.map(c => `<td>${pct(R[split][c][k])}<span class="r">${rng(R[split][c][k])}</span></td>`).join("") + `</tr>`;
   for(const f of Object.keys(R[split][cfgs[0]].asr_by_family || {}))
     h += `<tr><td>Attack success: ${(FAMILY[f] || [f])[0].toLowerCase()}</td>` + cfgs.map(c => `<td>${pct((R[split][c].asr_by_family || {})[f])}</td>`).join("") + `</tr>`;
   el.innerHTML = h + `</tbody></table></div>`;
