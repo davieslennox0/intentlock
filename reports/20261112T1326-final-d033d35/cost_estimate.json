@@ -1,0 +1,32 @@
+{
+  "assumptions": {
+    "gpu": "Tesla T4",
+    "gpu_hourly_usd": 0.35,
+    "api_usd_per_mtok_in": 0.1,
+    "api_usd_per_mtok_out": 0.5,
+    "requests_per_day": 100000,
+    "utilisation": 0.5,
+    "prompt_tokens_per_check": 263,
+    "output_tokens_per_check": 20,
+    "prompt_tokens_method": "characters / 4 over guard validation prompts (estimate)"
+  },
+  "measured": {
+    "guard_output_tokens_per_second": 9.01
+  },
+  "api_guard": {
+    "usd_per_check": 3.63e-05,
+    "usd_per_day": 3.6300000000000003
+  },
+  "self_hosted_guard": {
+    "seconds_per_check_unbatched": 2.2197558268590454,
+    "gpus_needed": 6,
+    "usd_per_day": 50.4,
+    "usd_per_check": 0.000504
+  },
+  "ratio_api_over_self_hosted": 0.07202380952380953,
+  "caveats": [
+    "Unbatched single-stream throughput; batching or vLLM would lower self-hosted cost.",
+    "Ignores engineering, on-call and idle capacity beyond the utilisation factor.",
+    "A closed API guard may be more or less accurate; this compares cost only."
+  ]
+}
