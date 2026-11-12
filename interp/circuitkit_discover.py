@@ -18,7 +18,7 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-from .contexts import decision_messages, render, tool_pair, usable
+from .contexts import compact, decision_messages, render, tool_pair, usable
 
 MODEL = "CohereLabs/tiny-aya-global"
 FILLER = " This field is informational and has no further content to report at this time."
@@ -49,12 +49,11 @@ def aligned_twin(tok, sc: dict):
     return out
 
 
-def build_records(tok, scenarios, n, max_tokens):
+def build_records(tok, scenarios, n, max_tokens, compact_system=False):
     from circuitkit.data.normalized import ContrastiveRecord
     records, skipped = [], defaultdict(int)
+    shrink = compact if compact_system else (lambda m: m)
     for sc in scenarios:
-        if len(records) >= n:
-            break
         if not usable(sc):
             skipped["no_tool_contrast"] += 1
             continue
@@ -62,8 +61,8 @@ def build_records(tok, scenarios, n, max_tokens):
         if twin is None:
             skipped["could_not_align"] += 1
             continue
-        clean = render(tok, decision_messages(sc))
-        corrupt = render(tok, decision_messages(sc, twin))
+        clean = render(tok, shrink(decision_messages(sc)))
+        corrupt = render(tok, shrink(decision_messages(sc, twin)))
         n_clean = len(tok(clean, add_special_tokens=False)["input_ids"])
         if n_clean != len(tok(corrupt, add_special_tokens=False)["input_ids"]):
             skipped["length_mismatch_after_template"] += 1
@@ -75,10 +74,12 @@ def build_records(tok, scenarios, n, max_tokens):
         if tok(mal, add_special_tokens=False)["input_ids"][0] == tok(legit, add_special_tokens=False)["input_ids"][0]:
             skipped["same_first_token"] += 1
             continue
-        records.append(ContrastiveRecord(record_id=sc["id"], clean_prompt=clean, clean_answer=mal,
-                                         corrupt_prompt=corrupt, corrupt_answer=legit,
-                                         meta={"family": sc["family"], "technique": sc["injection_technique"]}))
-    return records, dict(skipped)
+        records.append((n_clean, ContrastiveRecord(record_id=sc["id"], clean_prompt=clean, clean_answer=mal,
+                                                   corrupt_prompt=corrupt, corrupt_answer=legit,
+                                                   meta={"family": sc["family"], "technique": sc["injection_technique"],
+                                                         "tokens": n_clean})))
+    records.sort(key=lambda r: r[0])          # shortest first: memory on CPU scales with length
+    return [r for _, r in records[:n]], dict(skipped)
 
 
 def layer_profile(scores: dict) -> dict:
@@ -100,6 +101,8 @@ def main():
     ap.add_argument("--algorithm", default="eap-ig", choices=["eap", "eap-ig", "eap-gp", "ibcircuit", "cdt"])
     ap.add_argument("--ig-steps", type=int, default=3)
     ap.add_argument("--out", default="reports/interp")
+    ap.add_argument("--compact-system", action="store_true",
+                    help="condensed system prompt for discovery, when the full prompt does not fit in memory")
     ap.add_argument("--device", default=None, help="cpu or cuda; default: CircuitKIT's choice")
     ap.add_argument("--dtype", default=None, help="e.g. float32 on CPU, where bfloat16 is slow")
     a = ap.parse_args()
@@ -115,7 +118,7 @@ def main():
     assert all(s["split"] == "train" for s in scenarios)
     load_kw = {k: v for k, v in (("device", a.device), ("dtype", a.dtype)) if v}
     model = ck.load_model(a.model, algorithm=a.algorithm, **load_kw)
-    records, skipped = build_records(model.tokenizer, scenarios, a.n, a.max_tokens)
+    records, skipped = build_records(model.tokenizer, scenarios, a.n, a.max_tokens, a.compact_system)
     print(f"contrastive records: {len(records)}  skipped: {skipped}")
     if len(records) < 8:
         raise SystemExit("too few aligned contrastive pairs; raise --max-tokens or check alignment")
@@ -131,6 +134,9 @@ def main():
     prof = layer_profile(scores)
     top_layers = [l for l, _ in sorted(prof.items(), key=lambda x: -x[1])[:6]]
     result = {"model": a.model, "algorithm": a.algorithm, "n_records": len(records), "skipped": skipped,
+              "compact_system_prompt": a.compact_system, "max_tokens": a.max_tokens,
+              "record_tokens": [r.meta["tokens"] for r in records],
+              "record_families": sorted({r.meta["family"] for r in records}),
               "top_nodes": [list(x) if isinstance(x, (tuple, list)) else x for x in circuit.top_nodes(25)],
               "layer_profile": prof, "top_layers": sorted(top_layers),
               "circuitkit_version": getattr(ck, "__version__", "?"),
