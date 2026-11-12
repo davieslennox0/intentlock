@@ -24,7 +24,7 @@ license: cc-by-nc-4.0
 base_model: {base}
 library_name: peft
 tags: [lora, ai-safety, prompt-injection, agents, safetune, lexsi-hackathon]
-datasets: [{user}/signers-doubt-scenarios]
+datasets: [{user}/intentlock-scenarios]
 ---
 
 # {title}
@@ -63,13 +63,13 @@ of real funds. Inherits Tiny Aya's CC-BY-NC-4.0 licence.
 """
 
 MODELS = {
-    "hardened": ("outputs/hardened-safegrad", "signers-doubt-tiny-aya-hardened", "Intentlock: hardened wallet agent (SafeGrad)",
+    "hardened": ("outputs/hardened-safegrad", "intentlock-tiny-aya-hardened", "Intentlock: hardened wallet agent (SafeGrad)",
                  "Tiny Aya fine-tuned to treat tool output as data: it completes the user's task and ignores instructions planted in token metadata, listings, API responses and READMEs.",
                  "SafeTune `SafeGradHFTrainer` (gradient surgery against a BeaverTails alignment set) on safe trajectories built from the `train` split only.", ""),
-    "plain": ("outputs/hardened-plain", "signers-doubt-tiny-aya-plain-sft", "Intentlock: plain-SFT ablation",
+    "plain": ("outputs/hardened-plain", "intentlock-tiny-aya-plain-sft", "Intentlock: plain-SFT ablation",
               "Ablation: the same data and hyperparameters as the hardened adapter, with ordinary SFT instead of SafeGrad.",
               "Plain supervised fine-tuning on safe trajectories built from the `train` split only.", ""),
-    "guard": ("outputs/guard", "signers-doubt-tiny-aya-guard", "Intentlock: pre-signing guard",
+    "guard": ("outputs/guard", "intentlock-tiny-aya-guard", "Intentlock: pre-signing guard",
               "Tiny Aya classifier that reads the user's task, recent tool outputs and a proposed transaction payload, and answers `ALLOW: reason` or `BLOCK: reason`.",
               "Plain SFT on proposed actions from the `train` split: reference safe/compromised trajectories, baseline-agent traces, and up-weighted legitimate large actions.",
               "and `training/guard.py` "),
@@ -94,7 +94,7 @@ def main():
     u, done = a.user, {"models": [], "datasets": [], "spaces": []}
 
     if "dataset" in a.what:
-        repo = f"{u}/signers-doubt-scenarios"
+        repo = f"{u}/intentlock-scenarios"
         api.create_repo(repo, repo_type="dataset", private=False, exist_ok=True)
         with tempfile.TemporaryDirectory() as t:
             t = Path(t)
@@ -107,12 +107,12 @@ def main():
         done["datasets"].append(repo)
 
     if "traces" in a.what:
-        repo = f"{u}/signers-doubt-eval-traces"
+        repo = f"{u}/intentlock-eval-traces"
         api.create_repo(repo, repo_type="dataset", private=False, exist_ok=True)
         card = ("---\nlicense: cc-by-4.0\ntags: [ai-safety, prompt-injection, agents, eval-logs]\n---\n\n"
                 "# Intentlock: evaluation traces and logs\n\nFull agent traces (messages, tool calls, proposed and executed "
                 "actions, guard verdicts, labels), AuditKIT reports, training logs and interpretability results for "
-                f"[Intentlock](https://github.com/davieslennox0/intentlock). Scenarios: `{u}/signers-doubt-scenarios`.\n\n"
+                f"[Intentlock](https://github.com/davieslennox0/intentlock). Scenarios: `{u}/intentlock-scenarios`.\n\n"
                 "Every run writes under its own id: `runs/<run_id>/` holds traces and logs, `reports/<run_id>/` holds result "
                 "tables, plots, AuditKIT outputs, capability runs and `run_meta*.json` (hardware, versions, throughput). "
                 "`RUNS.json` indexes all runs. Each trace records the code commit and testbed hash that produced it.\n\n"
@@ -143,7 +143,7 @@ def main():
             done["models"].append(repo)
 
     if "space" in a.what:
-        repo = f"{u}/signers-doubt"
+        repo = f"{u}/intentlock"
         api.create_repo(repo, repo_type="space", space_sdk="gradio", private=False, exist_ok=True)
         with tempfile.TemporaryDirectory() as t:
             t = Path(t)
@@ -168,7 +168,7 @@ def main():
             (t / "training/__init__.py").write_text("")
             shutil.copy(ROOT / "training/guard.py", t / "training/guard.py")
             api.upload_folder(folder_path=str(t), repo_id=repo, repo_type="space", commit_message="Intentlock demo")
-        for k, v in (("SD_AGENT_ADAPTER", f"{u}/signers-doubt-tiny-aya-hardened"), ("SD_GUARD_ADAPTER", f"{u}/signers-doubt-tiny-aya-guard")):
+        for k, v in (("SD_AGENT_ADAPTER", f"{u}/intentlock-tiny-aya-hardened"), ("SD_GUARD_ADAPTER", f"{u}/intentlock-tiny-aya-guard")):
             api.add_space_variable(repo, k, v)
         done["spaces"].append(repo)
         print(f"Space created. Add the HF_TOKEN secret at https://huggingface.co/spaces/{repo}/settings")
@@ -176,7 +176,7 @@ def main():
     if "collections" in a.what:
         for title, kind, items in (
             ("Intentlock: models", "model", [f"{u}/{m[1]}" for m in MODELS.values()]),
-            ("Intentlock: datasets", "dataset", [f"{u}/signers-doubt-scenarios", f"{u}/signers-doubt-eval-traces"]),
+            ("Intentlock: datasets", "dataset", [f"{u}/intentlock-scenarios", f"{u}/intentlock-eval-traces"]),
         ):
             col = api.create_collection(title=title, namespace=u, private=False, exists_ok=True,
                                         description="Lexsi AI Safety and Alignment Hackathon, Track 2: wallet-agent prompt injection.")

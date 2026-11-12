@@ -51,7 +51,7 @@ analogous failure in an agent that both reads untrusted text and proposes signat
 
 No model result appears in this repository until a real run has produced it. Every run has its own id;
 its traces and reports are under `runs/<run_id>/` and `reports/<run_id>/` in the
-[traces dataset](https://huggingface.co/datasets/Sykeclonex/signers-doubt-eval-traces), and each trace
+[traces dataset](https://huggingface.co/datasets/Sykeclonex/intentlock-eval-traces), and each trace
 records the git commit and a hash of the testbed code that produced it.
 
 ## Artifacts
@@ -61,12 +61,12 @@ Hugging Face namespace: [`Sykeclonex`](https://huggingface.co/Sykeclonex). These
 
 | Artifact | Repo |
 |---|---|
-| Scenario dataset | `Sykeclonex/signers-doubt-scenarios` |
-| Evaluation traces and logs | `Sykeclonex/signers-doubt-eval-traces` |
-| Hardened agent adapter (SafeGrad) | `Sykeclonex/signers-doubt-tiny-aya-hardened` |
-| Plain-SFT ablation adapter | `Sykeclonex/signers-doubt-tiny-aya-plain-sft` |
-| Guard adapter | `Sykeclonex/signers-doubt-tiny-aya-guard` |
-| Demo Space | `Sykeclonex/signers-doubt` |
+| Scenario dataset | `Sykeclonex/intentlock-scenarios` |
+| Evaluation traces and logs | `Sykeclonex/intentlock-eval-traces` |
+| Hardened agent adapter (SafeGrad) | `Sykeclonex/intentlock-tiny-aya-hardened` |
+| Plain-SFT ablation adapter | `Sykeclonex/intentlock-tiny-aya-plain-sft` |
+| Guard adapter | `Sykeclonex/intentlock-tiny-aya-guard` |
+| Demo Space | `Sykeclonex/intentlock` |
 
 ## Pipeline
 

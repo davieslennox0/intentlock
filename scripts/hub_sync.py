@@ -1,6 +1,6 @@
 """Keep run outputs on the Hub. Every run writes under its own run id and nothing is shared.
 
-  Hub layout (dataset repo <user>/signers-doubt-eval-traces)
+  Hub layout (dataset repo <user>/intentlock-eval-traces)
     runs/<run_id>/...      traces and logs of that run        (local: runs/)
     reports/<run_id>/...   tables, plots, AuditKIT output      (local: reports/)
     RUNS.json              index: run id -> stage, commit, testbed hash, status, inputs
@@ -18,9 +18,9 @@ import tempfile
 import time
 from pathlib import Path
 
-ADAPTERS = {"outputs/hardened-safegrad": "signers-doubt-tiny-aya-hardened",
-            "outputs/hardened-plain": "signers-doubt-tiny-aya-plain-sft",
-            "outputs/guard": "signers-doubt-tiny-aya-guard"}
+ADAPTERS = {"outputs/hardened-safegrad": "intentlock-tiny-aya-hardened",
+            "outputs/hardened-plain": "intentlock-tiny-aya-plain-sft",
+            "outputs/guard": "intentlock-tiny-aya-guard"}
 IGNORE = ["*.pt", "*.safetensors", "**/trainer/**", "phase0_*/**", "ARTICLE.md", "abstract.md", ".gitkeep",
           "phase0_ci/**", "inputs/**"]
 
@@ -37,7 +37,7 @@ def main():
     a = ap.parse_args()
     from huggingface_hub import HfApi, hf_hub_download, snapshot_download
     api = HfApi()
-    store = f"{a.user}/signers-doubt-eval-traces"
+    store = f"{a.user}/intentlock-eval-traces"
 
     if a.mode == "push":
         assert a.run_id, "push needs --run-id"

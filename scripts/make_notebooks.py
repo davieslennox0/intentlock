@@ -61,7 +61,7 @@ NOTEBOOKS = {
         ("code", "from huggingface_hub import snapshot_download\nimport os\n"
                  "for name, out in (('hardened', 'hardened-safegrad'), ('plain-sft', 'hardened-plain'), ('guard', 'guard')):\n"
                  "    if not os.path.exists(f'outputs/{out}/adapter'):\n"
-                 "        snapshot_download(f'{HF_USER}/signers-doubt-tiny-aya-{name}', local_dir=f'outputs/{out}/adapter')"),
+                 "        snapshot_download(f'{HF_USER}/intentlock-tiny-aya-{name}', local_dir=f'outputs/{out}/adapter')"),
         ("md", "### Phase 5 (stretch): CircuitKIT discovery, then causal tests\nDiscovery is attribution only. The claim rests on `causal_eval`, which ablates the direction, "
                "compares against a random-direction control, and checks the held-out split. A negative verdict is a result and gets reported."),
         ("code", "!python -m interp.circuitkit_discover --n 24 --algorithm eap-ig --out reports/interp"),
