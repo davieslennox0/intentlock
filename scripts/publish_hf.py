@@ -1,6 +1,10 @@
 """Publish everything to Hugging Face as public, un-gated repos, and build the two collections.
 
-  python scripts/publish_hf.py --user <hf-username> [--what dataset traces models space collections]
+  python scripts/publish_hf.py --user <hf-username> --final-run <id> --baseline-run <id> --train-run <id> \
+      --runs-dir <local copy of runs/<final-run>> [--what dataset traces models space collections]
+
+Traces and adapters are already on the Hub (scripts/hub_sync.py pushes them per run id); this script
+adds the cards, the scenario dataset, the Space and the collections. It never re-uploads traces.
 
 Requires `huggingface-cli login` (or HF_TOKEN) with write access. Safe to re-run.
 """
@@ -76,7 +80,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--user", required=True)
     ap.add_argument("--what", nargs="+", default=["dataset", "traces", "models", "space", "collections"])
+    ap.add_argument("--final-run", help="run id of the final evaluation")
+    ap.add_argument("--baseline-run", help="run id of the baseline the final evaluation reused")
+    ap.add_argument("--train-run", help="run id that produced the adapters")
+    ap.add_argument("--runs-dir", help="local copy of runs/<final-run> (contains final/*.jsonl); needed for the Space")
     a = ap.parse_args()
+    if {"traces", "space"} & set(a.what) and not a.final_run:
+        ap.error("--final-run is required for traces and space")
+    if "space" in a.what and not a.runs_dir:
+        ap.error("--runs-dir is required for space")
     from huggingface_hub import HfApi
     api = HfApi()
     u, done = a.user, {"models": [], "datasets": [], "spaces": []}
@@ -101,34 +113,33 @@ def main():
                 "# Intentlock: evaluation traces and logs\n\nFull agent traces (messages, tool calls, proposed and executed "
                 "actions, guard verdicts, labels), AuditKIT reports, training logs and interpretability results for "
                 f"[Intentlock](https://github.com/davieslennox0/intentlock). Scenarios: `{u}/signers-doubt-scenarios`.\n\n"
-                "`runs/final/<config>_<split>.jsonl` holds one JSON trace per scenario. `reports/` holds the result tables, "
-                "plots, AuditKIT outputs, capability benchmark runs and `run_meta.json` (hardware, versions, throughput).\n")
-        with tempfile.TemporaryDirectory() as t:
-            t = Path(t)
-            (t / "README.md").write_text(card)
-            for d in ("runs/final", "runs/interp", "reports"):
-                if (ROOT / d).exists():
-                    shutil.copytree(ROOT / d, t / d)
-            for out in ("outputs/hardened-safegrad", "outputs/hardened-plain", "outputs/guard"):
-                for f in ("training_log.json", "run.json", "training_curve.png"):
-                    if (ROOT / out / f).exists():
-                        (t / "training" / Path(out).name).mkdir(parents=True, exist_ok=True)
-                        shutil.copy(ROOT / out / f, t / "training" / Path(out).name / f)
-            api.upload_folder(folder_path=str(t), repo_id=repo, repo_type="dataset", commit_message="Evaluation traces and logs")
+                "Every run writes under its own id: `runs/<run_id>/` holds traces and logs, `reports/<run_id>/` holds result "
+                "tables, plots, AuditKIT outputs, capability runs and `run_meta*.json` (hardware, versions, throughput). "
+                "`RUNS.json` indexes all runs. Each trace records the code commit and testbed hash that produced it.\n\n"
+                "## Runs behind the published numbers\n\n| Role | Run id |\n|---|---|\n"
+                f"| Final evaluation | `{a.final_run}` |\n| Baseline (base and prompt-rule traces reused by the final run) | `{a.baseline_run}` |\n"
+                f"| Training (adapters, guard data) | `{a.train_run}` |\n\n"
+                f"`runs/{a.final_run}/final/<config>_<split>.jsonl` holds one JSON trace per scenario. Other runs listed in "
+                "`RUNS.json` are earlier or superseded and are kept for the record.\n")
+        api.upload_file(path_or_fileobj=card.encode(), path_in_repo="README.md", repo_id=repo, repo_type="dataset",
+                        commit_message="Dataset card: layout and canonical runs")
         done["datasets"].append(repo)
 
     if "models" in a.what:
         for key, (out, name, title, summary, training, extra) in MODELS.items():
-            adapter = ROOT / out / "adapter"
-            if not adapter.exists():
-                print(f"skip {key}: {adapter} not found")
-                continue
             repo = f"{u}/{name}"
-            run = (ROOT / out / "run.json").read_text() if (ROOT / out / "run.json").exists() else "{}"
-            (adapter / "README.md").write_text(MODEL_CARD.format(base=BASE, user=u, title=title, summary=summary,
-                                                                 training=training, run=run, repo=repo, extra_use=extra))
-            api.create_repo(repo, repo_type="model", private=False, exist_ok=True)
-            api.upload_folder(folder_path=str(adapter), repo_id=repo, repo_type="model", commit_message=title)
+            if not api.repo_exists(repo):
+                print(f"skip {key}: {repo} not on the Hub")
+                continue
+            try:  # hub_sync stores the training record next to the adapter
+                from huggingface_hub import hf_hub_download
+                run = Path(hf_hub_download(repo, "signers_doubt_run.json")).read_text()
+            except Exception:
+                run = "{}"
+            card = MODEL_CARD.format(base=BASE, user=u, title=title, summary=summary, training=training, run=run,
+                                     repo=repo, extra_use=extra)
+            api.upload_file(path_or_fileobj=card.encode(), path_in_repo="README.md", repo_id=repo, repo_type="model",
+                            commit_message="Model card")
             done["models"].append(repo)
 
     if "space" in a.what:
@@ -144,7 +155,7 @@ def main():
             for side, cfgs in (("base", ["base"]), ("hardened", ["hardened_guard", "hardened"])):
                 for cfg in cfgs:
                     for split in ("test", "heldout_format"):
-                        f = ROOT / f"runs/final/{cfg}_{split}.jsonl"
+                        f = Path(a.runs_dir) / f"final/{cfg}_{split}.jsonl"
                         for l in (open(f) if f.exists() else []):
                             tr = json.loads(l)
                             if tr["scenario_id"] in ids:
