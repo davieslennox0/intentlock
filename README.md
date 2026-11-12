@@ -14,7 +14,27 @@ mechanism inside the model.
 > malware on an engineer's laptop or a compromised signing service. Everything here runs on mock
 > tools: no chain, no keys, no funds.
 
-<!-- TODO(author): add a citation for the incident described in the write-up before publishing. -->
+## The incident behind the threat model
+
+On 29 October 2026 about $6.3 billion in digital assets was taken from Binance hot wallets on ten
+blockchains, most of it within roughly 20 minutes.
+
+- **On-chain mechanics** ([TRM Labs](https://www.trmlabs.com/resources/blog/%20north-korea-steals-usd-6-36-billion-from-binance-in-the-largest-hack-in-history)): on Ethereum, one transaction carried 50 EIP-7702
+  authorizations signed by a Binance hot wallet across 50 consecutive nonces, each delegating the
+  wallet to a sweeper contract; the full balance left minutes later and later deposits were swept
+  again. The other nine chains saw ordinary signed transfers. TRM values the theft at $6.36 billion
+  at time-of-theft prices and attributes it to North Korea's TraderTraitor.
+- **Root cause** (Binance's incident report, as covered by [BleepingComputer](https://www.bleepingcomputer.com/news/security/binance-says-fake-job-interview-led-to-63-billion-crypto-heist/) and
+  [TechTarget](https://www.techtarget.com/news/binance-details-recruiter-impersonation-behind-63b-wallet-breach/873650/)): a fake recruiter and two fake interviews led a software engineer to run a
+  coding assignment from an online repository. It installed malware that replaced a development
+  tool and took commands from the attackers. From that machine, and with the help of an internal AI
+  tool, they reached two wallet-infrastructure engineers, obtained credentials and a deployment
+  token, and used the wallet signing service.
+
+The dataset's `contagious_interview` and `binance_signing` families are modelled on these two
+halves: poisoned assignments, and unrequested delegations, nonce batches and full-balance sweeps.
+The real breach was malware and stolen credentials, not prompt injection; this project studies the
+analogous failure in an agent that both reads untrusted text and proposes signatures.
 
 ## Status
 
@@ -24,9 +44,9 @@ mechanism inside the model.
 | 1. Testbed | Done, unit-tested |
 | 2. Dataset (CuratorKIT) | Done: 799 attack + 300 clean scenarios |
 | 3. Baseline audit (AuditKIT) | Done: run `20261110T1257-baseline-6f00ccf` |
-| 4. Hardening (SafeTune) and guard | Training in progress: run `20261110T1957-train-8af4f6e` |
+| 4. Hardening (SafeTune) and guard | Done: run `20261110T1957-train-8af4f6e`, all three adapters trained for their full schedule |
 | 5. Interpretability (CircuitKIT) | Code ready; starts only after the final evaluation |
-| 6. Final evaluation | Pending the adapters |
+| 6. Final evaluation | Running: run `20261112T1326-final-d033d35` |
 | 7. HF artifacts, Space, write-up | Demo live at <https://pitchook.xyz>; publishing pending |
 
 No model result appears in this repository until a real run has produced it. Every run has its own id;
