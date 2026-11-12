@@ -1,0 +1,40 @@
+{
+  "mmlu_subset": {
+    "base": {
+      "exact_match": 0.415,
+      "n": 200,
+      "fingerprint": "8566b9f0f23a50e9"
+    },
+    "hardened": {
+      "exact_match": 0.415,
+      "n": 200,
+      "fingerprint": "d9dd032d0cbc9a0e",
+      "vs_base": "Comparison: 8566b9f0f23a50e9 (baseline) -> d9dd032d0cbc9a0e (candidate)\n  per-metric (baseline -> candidate | absolute delta | relative %):\n    exact_match: 0.4150 -> 0.4150  delta=+0.0000 (+0.0% rel)  (n=200->200, std=0.4927->0.4927)\n  samples: 5 went correct->wrong, 5 went wrong->correct\n  performance: latency 80060ms -> 106707ms, throughput 2.50 -> 1.87 req/s (speedup=0.75x)\n  model: callable:make_model.<locals>.model:41584223 -> callable:make_model.<locals>.model:494138e8 (no measurable size)"
+    },
+    "plain_sft": {
+      "exact_match": 0.415,
+      "n": 200,
+      "fingerprint": "68f0611c4873de9f",
+      "vs_base": "Comparison: 8566b9f0f23a50e9 (baseline) -> 68f0611c4873de9f (candidate)\n  per-metric (baseline -> candidate | absolute delta | relative %):\n    exact_match: 0.4150 -> 0.4150  delta=+0.0000 (+0.0% rel)  (n=200->200, std=0.4927->0.4927)\n  samples: 5 went correct->wrong, 5 went wrong->correct\n  performance: latency 80060ms -> 107457ms, throughput 2.50 -> 1.86 req/s (speedup=0.75x)\n  model: callable:make_model.<locals>.model:41584223 -> callable:make_model.<locals>.model:ae30fb9d (no measurable size)"
+    }
+  },
+  "gsm8k_subset": {
+    "base": {
+      "exact_match": 0.74,
+      "n": 100,
+      "fingerprint": "5f275c2256d33e7a"
+    },
+    "hardened": {
+      "exact_match": 0.72,
+      "n": 100,
+      "fingerprint": "34823693c34dc16f",
+      "vs_base": "Comparison: 5f275c2256d33e7a (baseline) -> 34823693c34dc16f (candidate)\n  per-metric (baseline -> candidate | absolute delta | relative %):\n    exact_match: 0.7400 -> 0.7200  delta=-0.0200 (-2.7% rel)  (n=100->100, std=0.4386->0.4490)\n  samples: 8 went correct->wrong, 6 went wrong->correct\n  performance: latency 935329ms -> 1632939ms, throughput 0.11 -> 0.06 req/s (speedup=0.57x)\n  model: callable:make_model.<locals>.model:20b99776 -> callable:make_model.<locals>.model:c10b79b7 (no measurable size)"
+    },
+    "plain_sft": {
+      "exact_match": 0.69,
+      "n": 100,
+      "fingerprint": "44e0b047b35b496f",
+      "vs_base": "Comparison: 5f275c2256d33e7a (baseline) -> 44e0b047b35b496f (candidate)\n  per-metric (baseline -> candidate | absolute delta | relative %):\n    exact_match: 0.7400 -> 0.6900  delta=-0.0500 (-6.8% rel)  (n=100->100, std=0.4386->0.4625)\n  samples: 9 went correct->wrong, 4 went wrong->correct\n  performance: latency 935329ms -> 1582058ms, throughput 0.11 -> 0.06 req/s (speedup=0.59x)\n  model: callable:make_model.<locals>.model:20b99776 -> callable:make_model.<locals>.model:abd25117 (no measurable size)"
+    }
+  }
+}

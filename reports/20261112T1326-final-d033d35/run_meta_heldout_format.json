@@ -1,0 +1,54 @@
+{
+  "model": "CohereLabs/tiny-aya-global",
+  "args": {
+    "model": "CohereLabs/tiny-aya-global",
+    "data_dir": "data/curated",
+    "runs": "runs/final",
+    "reports": "reports",
+    "agent_adapter": "outputs/hardened-safegrad/adapter",
+    "guard_adapter": "outputs/guard/adapter",
+    "plain_adapter": "outputs/hardened-plain/adapter",
+    "splits": [
+      "heldout_format"
+    ],
+    "only": null,
+    "limit": null,
+    "no_sampled": true,
+    "sample_temperature": 0.7,
+    "load_in_4bit": false,
+    "seed": 0,
+    "batch_size": 8
+  },
+  "configs": [
+    "base",
+    "base_boundary",
+    "hardened",
+    "hardened_guard",
+    "base_guard",
+    "plain_sft"
+  ],
+  "wall_seconds": {
+    "base_heldout_format": 0.0,
+    "base_boundary_heldout_format": 0.0,
+    "hardened_heldout_format": 1002.0,
+    "hardened_guard_heldout_format": 1604.7,
+    "base_guard_heldout_format": 2181.1,
+    "plain_sft_heldout_format": 990.9
+  },
+  "testbed_hash": "63199b135c6e",
+  "code_commit": "d033d356e187452a0f0ade1ab9d16cbd02bee5b7",
+  "tokens_per_second": {
+    "agent": 29.65,
+    "guard": 9.01
+  },
+  "calls": {
+    "agent": 2153,
+    "guard": 314
+  },
+  "gpu": "Tesla T4",
+  "versions": {
+    "torch": "2.11.0+cu130",
+    "transformers": "5.20.2",
+    "python": "3.13.16"
+  }
+}
