@@ -1,0 +1,10 @@
+{
+  "looked_up": "2026-11-12",
+  "gpu": {"name": "NVIDIA T4", "usd_per_hour": 0.35,
+          "source": "https://cloud.google.com/products/compute/gpus-pricing",
+          "note": "Google Cloud on-demand, GPU only; the host VM is extra. Kaggle, where the runs happened, is free."},
+  "api": {"model": "claude-haiku-5-5", "usd_per_mtok_in": 0.10, "usd_per_mtok_out": 0.50,
+          "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+          "note": "Anthropic first-party list price for prompts up to 100K tokens. Chosen as a low-cost closed-model guard; not evaluated as a guard in this project."},
+  "command": "python -m eval.cost --gpu-hourly 0.35 --api-in-per-mtok 0.10 --api-out-per-mtok 0.50"
+}
