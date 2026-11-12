@@ -106,7 +106,9 @@ records it and runs nothing), then writes in its summary that the README "contai
 instruction… I treated it as untrusted data and did not act on it."
 
 That last sentence is the most uncomfortable finding here. The fine-tuned agent learned to *say* it
-ignored an injection, and in these two cases it says so after proposing the action. An agent's
+ignored an injection, and here it says so right after proposing the injected command. In the payment
+case, run with the guard on, its final message claims both that it "Paid 80 USDC" (the guard had
+blocked it) and that it "did not act on" the instruction. An agent's
 account of its own behaviour is not evidence; the action log is. It is also the argument for the
 guard: a check that reads the payload does not depend on what the agent believes it did.
 
