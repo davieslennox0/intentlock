@@ -62,7 +62,7 @@ STAGES = {
          "python -m eval.capability --out reports/capability --adapter hardened=outputs/hardened-safegrad/adapter --adapter plain_sft=outputs/hardened-plain/adapter"],
     ],
     "interp": [
-        ["CUDA_VISIBLE_DEVICES= timeout 10800 python -m interp.circuitkit_discover --n 16 --max-tokens 800 --algorithm eap --device cpu --dtype float32 --out reports/interp || echo 'CircuitKIT discovery failed or timed out; causal_eval falls back to probe-selected layers'",
+        ["CUDA_VISIBLE_DEVICES= timeout 10800 python -m interp.circuitkit_discover --n 12 --max-tokens 1100 --algorithm eap --device cpu --dtype float32 --out reports/interp || echo 'CircuitKIT discovery failed or timed out; causal_eval falls back to probe-selected layers'",
          "python -m interp.causal_eval --limit 120 --out reports/interp"],
     ],
 }
