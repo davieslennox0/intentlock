@@ -67,6 +67,7 @@ Hugging Face namespace: [`Sykeclonex`](https://huggingface.co/Sykeclonex). All r
 | Guard adapter | [`Sykeclonex/intentlock-tiny-aya-guard`](https://huggingface.co/Sykeclonex/intentlock-tiny-aya-guard) |
 | Demo Space (replay of recorded episodes from the final run; no live model) | [`Sykeclonex/intentlock`](https://huggingface.co/spaces/Sykeclonex/intentlock) |
 | Project page | <https://pitchook.xyz> |
+| Demo video (2 min 26, voice-over; replay of recorded episodes, no live model) | [`demo/intentlock-demo.mp4`](demo/intentlock-demo.mp4) ([how it is built](demo/README.md)) |
 
 The Space is static: it replays recorded episodes and runs no model, because a Gradio Space needs a
 paid Hub plan. The live Gradio app is in `space/` (`scripts/publish_hf.py --space-sdk gradio`).
