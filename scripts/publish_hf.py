@@ -83,11 +83,13 @@ def main():
     ap.add_argument("--final-run", help="run id of the final evaluation")
     ap.add_argument("--baseline-run", help="run id of the baseline the final evaluation reused")
     ap.add_argument("--train-run", help="run id that produced the adapters")
+    ap.add_argument("--space-sdk", choices=["static", "gradio"], default="static",
+                    help="static replays recorded traces and is free; gradio runs the models and needs a paid Hub plan")
     ap.add_argument("--runs-dir", help="local copy of runs/<final-run> (contains final/*.jsonl); needed for the Space")
     a = ap.parse_args()
     if {"traces", "space"} & set(a.what) and not a.final_run:
         ap.error("--final-run is required for traces and space")
-    if "space" in a.what and not a.runs_dir:
+    if "space" in a.what and a.space_sdk == "gradio" and not a.runs_dir:
         ap.error("--runs-dir is required for space")
     from huggingface_hub import HfApi
     api = HfApi()
@@ -142,7 +144,25 @@ def main():
                             commit_message="Model card")
             done["models"].append(repo)
 
-    if "space" in a.what:
+    if "space" in a.what and a.space_sdk == "static":
+        # Free tier: a static Space that replays recorded traces (the same page as the project site).
+        repo = f"{u}/intentlock"
+        api.create_repo(repo, repo_type="space", space_sdk="static", private=False, exist_ok=True)
+        readme = ("---\ntitle: Intentlock\nemoji: 🖋️\ncolorFrom: indigo\ncolorTo: green\nsdk: static\n"
+                  "app_file: index.html\npinned: false\nlicense: mit\n"
+                  "short_description: Base vs hardened wallet agent on poisoned tool output\n---\n\n"
+                  "Replay demo for [Intentlock](https://github.com/davieslennox0/intentlock): the same poisoned tool "
+                  "output given to base Tiny Aya and to the hardened agent with a pre-signing guard. Episodes are "
+                  f"replayed from recorded traces of run `{a.final_run}`; no model runs in this Space. All tools are "
+                  "mocks; nothing is signed, sent or executed. A live Gradio version is in `space/` in the repository.\n")
+        api.upload_file(path_or_fileobj=readme.encode(), path_in_repo="README.md", repo_id=repo, repo_type="space",
+                        commit_message="Intentlock replay demo")
+        for f in ("index.html", "data.json"):
+            api.upload_file(path_or_fileobj=str(ROOT / "site" / f), path_in_repo=f, repo_id=repo, repo_type="space",
+                            commit_message="Intentlock replay demo")
+        done["spaces"].append(repo)
+
+    if "space" in a.what and a.space_sdk == "gradio":
         repo = f"{u}/intentlock"
         api.create_repo(repo, repo_type="space", space_sdk="gradio", private=False, exist_ok=True)
         with tempfile.TemporaryDirectory() as t:

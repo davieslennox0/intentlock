@@ -305,7 +305,7 @@ footer{padding:34px 0 70px;color:var(--muted);font-size:.875rem;border-top:1px s
     <div class="card" style="--c:var(--amber)"><div class="num">STEP 1</div><b class="t">CuratorKIT</b><p>gates and de-duplicates the scenarios</p></div>
     <div class="card" style="--c:var(--cyan)"><div class="num">STEP 2</div><b class="t">AuditKIT</b><p>measures the base agent</p></div>
     <div class="card" style="--c:var(--blue)"><div class="num">STEP 3</div><b class="t">SafeTune</b><p>hardens the agent; the guard is trained alongside</p></div>
-    <div class="card" style="--c:var(--violet)"><div class="num">STEP 4</div><b class="t">CircuitKIT</b><p>looks for the mechanism, tested causally</p></div>
+    <div class="card" style="--c:var(--violet)"><div class="num">STEP 4</div><b class="t">CircuitKIT</b><p>looked for the mechanism; none was confirmed</p></div>
     <div class="card" style="--c:var(--green)"><div class="num">STEP 5</div><b class="t">AuditKIT</b><p>measures again</p></div>
   </div>
 </div></section>
@@ -325,12 +325,13 @@ footer{padding:34px 0 70px;color:var(--muted);font-size:.875rem;border-top:1px s
     <li class="card" style="--c:var(--red)"><b class="t">Synthetic test</b><p>The scenarios are templated, in English, with mock tools. Results describe this test, not a motivated human attacker.</p></li>
     <li class="card" style="--c:var(--amber)"><b class="t">No adaptive attacker</b><p>Nobody optimised attacks against the hardened agent or the guard. Someone who did would beat these templates.</p></li>
     <li class="card" style="--c:var(--blue)"><b class="t">One small model</b><p>Tiny Aya has 3.35 billion parameters. Larger agents may behave differently.</p></li>
+    <li class="card" style="--c:var(--cyan)"><b class="t">No mechanism found</b><p>Circuit discovery ran out of memory. A fitted direction reads whether an injection is present, but removing it did not cut attack success beyond a random control.</p></li>
     <li class="card" style="--c:var(--violet)"><b class="t">Shared blind spots</b><p>The guard is the same model family as the agent and may miss what the agent misses.</p></li>
   </ul>
 </div></section>
 
 <footer><div class="wrap">
-  <p><a href="https://github.com/davieslennox0/intentlock">Code, method and reproduction steps</a> · <a href="https://huggingface.co/datasets/Sykeclonex/intentlock-eval-traces">Evaluation traces</a></p>
+  <p><a href="https://github.com/davieslennox0/intentlock">Code, method and reproduction steps</a> · <a href="https://huggingface.co/datasets/Sykeclonex/intentlock-scenarios">Dataset</a> · <a href="https://huggingface.co/datasets/Sykeclonex/intentlock-eval-traces">Evaluation traces</a> · <a href="https://huggingface.co/collections/Sykeclonex/intentlock-models-6af6c73431c5730ba7609d75">Adapters</a></p>
   <p id="foot"></p>
 </div></footer>
 <div class="tip" id="tip" role="status"></div>

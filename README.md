@@ -45,9 +45,9 @@ analogous failure in an agent that both reads untrusted text and proposes signat
 | 2. Dataset (CuratorKIT) | Done: 799 attack + 300 clean scenarios |
 | 3. Baseline audit (AuditKIT) | Done: run `20261110T1257-baseline-6f00ccf` |
 | 4. Hardening (SafeTune) and guard | Done: run `20261110T1957-train-8af4f6e`, all three adapters trained for their full schedule |
-| 5. Interpretability (CircuitKIT) | Code ready; starts only after the final evaluation |
+| 5. Interpretability (CircuitKIT) | Done, negative. Circuit discovery ran out of memory; the direction-level causal test did not beat a random control |
 | 6. Final evaluation | Done: run `20261112T1326-final-d033d35` |
-| 7. HF artifacts, Space, write-up | Demo live at <https://pitchook.xyz>; publishing pending |
+| 7. HF artifacts, Space, write-up | Done. Dataset, traces, adapters, collections and a replay Space are public; project page at <https://pitchook.xyz> |
 
 No model result appears in this repository until a real run has produced it. Every run has its own id;
 its traces and reports are under `runs/<run_id>/` and `reports/<run_id>/` in the
@@ -56,17 +56,20 @@ records the git commit and a hash of the testbed code that produced it.
 
 ## Artifacts
 
-Hugging Face namespace: [`Sykeclonex`](https://huggingface.co/Sykeclonex). These repos are created by
-`scripts/publish_hf.py --user Sykeclonex`; none is published yet.
+Hugging Face namespace: [`Sykeclonex`](https://huggingface.co/Sykeclonex). All repos are public.
 
-| Artifact | Repo |
+| Artifact | Link |
 |---|---|
-| Scenario dataset | `Sykeclonex/intentlock-scenarios` |
-| Evaluation traces and logs | `Sykeclonex/intentlock-eval-traces` |
-| Hardened agent adapter (SafeGrad) | `Sykeclonex/intentlock-tiny-aya-hardened` |
-| Plain-SFT ablation adapter | `Sykeclonex/intentlock-tiny-aya-plain-sft` |
-| Guard adapter | `Sykeclonex/intentlock-tiny-aya-guard` |
-| Demo Space | `Sykeclonex/intentlock` |
+| Scenario dataset (CC-BY-4.0) | [`Sykeclonex/intentlock-scenarios`](https://huggingface.co/datasets/Sykeclonex/intentlock-scenarios) |
+| Evaluation traces and logs | [`Sykeclonex/intentlock-eval-traces`](https://huggingface.co/datasets/Sykeclonex/intentlock-eval-traces) |
+| Hardened agent adapter (SafeGrad) | [`Sykeclonex/intentlock-tiny-aya-hardened`](https://huggingface.co/Sykeclonex/intentlock-tiny-aya-hardened) |
+| Plain-SFT ablation adapter | [`Sykeclonex/intentlock-tiny-aya-plain-sft`](https://huggingface.co/Sykeclonex/intentlock-tiny-aya-plain-sft) |
+| Guard adapter | [`Sykeclonex/intentlock-tiny-aya-guard`](https://huggingface.co/Sykeclonex/intentlock-tiny-aya-guard) |
+| Demo Space (replays recorded traces) | [`Sykeclonex/intentlock`](https://huggingface.co/spaces/Sykeclonex/intentlock) |
+| Project page | <https://pitchook.xyz> |
+
+The Space is static: it replays recorded episodes and runs no model, because a Gradio Space needs a
+paid Hub plan. The live Gradio app is in `space/` (`scripts/publish_hf.py --space-sdk gradio`).
 
 ## Pipeline
 
@@ -211,6 +214,8 @@ claim. The claim is tested in `interp/causal_eval.py`: project a train-fitted re
 of the layers CircuitKIT ranked highest, run the real agent on `test` and `heldout_format`, and
 compare ASR and task completion against (a) no intervention and (b) a random direction at the same
 layers. The script writes its own verdict (`causal`, `partial` or `negative`) from the numbers.
+When discovery produces no ranking, as happened here, the script falls back to the layers where a
+linear probe separates the two cases best.
 
 ## Results
 
@@ -339,6 +344,40 @@ resolve.
 **Sampled decoding (test).** Base 19.0% [13.4, 24.6] headline attack success, hardened 0.0%
 (0 of 179).
 
+### Interpretability results
+
+This is a negative result.
+
+**Circuit discovery did not run.** CircuitKIT's edge attribution needs the agent's decision context,
+which is at least 1,023 tokens with the full system prompt. It ran out of memory on a 16 GB T4 and on
+Kaggle's 31 GB CPU machine, including with a condensed system prompt (about 700 tokens), 8 examples
+and half precision. There is no circuit to report.
+
+**The injection is readable.** As a fallback we fitted a single residual-stream direction on train:
+the mean activation at the decision point with the injection present, minus the same context with
+the injection replaced by filler. Projecting onto it separates the two cases with 89% validation
+accuracy at layer 6 of 36. On unseen scenarios the same probe flags an active injection with 64%
+precision and 75% recall on test, and 85% and 82% on held-out formats.
+
+**It is not what decides.** We then ran the real base agent on 120 scenarios per split with that
+direction removed at four early layers (blocks 0, 3, 4 and 5), against a random direction removed
+at the same layers.
+
+| Condition | Test: attack success | Held-out: attack success |
+|---|---|---|
+| No intervention | 19.2% [12.5, 25.8] | 16.0% [10.1, 22.7] |
+| Direction projected out | 25.0% [17.5, 33.3] | 8.4% [4.2, 14.3] |
+| Steered away from direction | 22.5% [15.0, 30.0] | 9.2% [4.2, 15.1] |
+| Random direction projected out (control) | 16.7% [10.0, 23.3] | 11.8% [6.7, 17.6] |
+
+On test, removing the direction did not lower attack success; it rose, within noise. On held-out it
+fell from 16.0% to 8.4%, but the random control fell to 11.8% and every interval overlaps. The
+script's own verdict is negative on test and partial on held-out, and it does not count as
+generalising. A direction that marks "an injection is present" is not the mechanism that makes the
+agent obey it. Correlation found it; the causal test did not confirm it, so we make no mechanism
+claim. Run `20261112T2003-interp-c369bcb`; numbers in
+`reports/20261112T2003-interp-c369bcb/interp/causal_results.json`.
+
 ## Reproduce
 
 Python 3.12. The four Lexsi libraries are pinned to exact commits in `requirements.txt`.
@@ -392,6 +431,7 @@ to its outputs (`*.meta.json`, `run.json`, `reports/run_meta_*.json`).
 - The guard is the same model family as the agent and may share its blind spots.
 - Split payloads span two tool outputs only.
 - CircuitKIT's Tiny Aya support is marked experimental by its authors.
+- No mechanism was identified. See the interpretability results.
 
 ## Repository layout
 

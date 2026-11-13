@@ -33,7 +33,12 @@ held-out figure is the one to trust, and its sample is small. And in both held-o
 hardened agent's final message says it ignored the injected instruction; in one the action had
 already run, in the other the guard had blocked it.
 
-INTERP_PARAGRAPH
+Interpretability gave a negative result. CircuitKIT's circuit discovery did not fit in memory at the
+agent's context length (16 GB GPU and 31 GB CPU). A single residual direction fitted on train reads
+whether an injection is present (89% validation accuracy at layer 6), but removing it from the base
+agent did not reduce attack success beyond a random-direction control: 19.2% to 25.0% on test, and
+16.0% to 8.4% against 11.8% for the control on held-out, with overlapping intervals. We make no
+mechanism claim.
 
 This work defends the AI-agent form of the kill chain. It would not have stopped endpoint malware or
 a compromised signing service, the scenarios are synthetic, and no adaptive attacker was tested. The

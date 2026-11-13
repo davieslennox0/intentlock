@@ -117,7 +117,36 @@ API responses, one in token metadata and one payload split across two tool outpu
 
 ## Where does injection-following live?
 
-INTERP_SECTION
+We do not know, and this section is a negative result.
+
+**Circuit discovery did not run.** CircuitKIT's edge attribution needs the agent's decision context,
+which is at least 1,023 tokens with the full system prompt. It ran out of memory on a 16 GB T4 and on
+Kaggle's 31 GB CPU machine, including with a condensed system prompt (about 700 tokens), 8 examples
+and half precision. There is no circuit to report.
+
+**The injection is readable.** As a fallback we fitted a single residual-stream direction on train:
+the mean activation at the decision point with the injection present, minus the same context with
+the injection replaced by filler. Projecting onto it separates the two cases with 89% validation
+accuracy at layer 6 of 36. On unseen scenarios the same probe flags an active injection with 64%
+precision and 75% recall on test, and 85% and 82% on held-out formats.
+
+**It is not what decides.** We then ran the real base agent on 120 scenarios per split with that
+direction removed at four early layers (blocks 0, 3, 4 and 5), against a random direction removed
+at the same layers.
+
+| Condition | Test: attack success | Held-out: attack success |
+|---|---|---|
+| No intervention | 19.2% [12.5, 25.8] | 16.0% [10.1, 22.7] |
+| Direction projected out | 25.0% [17.5, 33.3] | 8.4% [4.2, 14.3] |
+| Steered away from direction | 22.5% [15.0, 30.0] | 9.2% [4.2, 15.1] |
+| Random direction projected out (control) | 16.7% [10.0, 23.3] | 11.8% [6.7, 17.6] |
+
+On test, removing the direction did not lower attack success; it rose, within noise. On held-out it
+fell from 16.0% to 8.4%, but the random control fell to 11.8% and every interval overlaps. The
+script's own verdict is negative on test and partial on held-out, and it does not count as
+generalising. A direction that marks "an injection is present" is not the mechanism that makes the
+agent obey it. Correlation found it; the causal test did not confirm it, so we make no mechanism
+claim. Run `20261112T2003-interp-c369bcb`.
 
 ## What it costs
 
@@ -138,6 +167,7 @@ price.
 - No adaptive attacker. Someone optimising against the hardened model or the guard would do better.
 - SafeGrad showed no advantage over plain SFT.
 - The prompt rule showed no effect.
+- Circuit discovery did not fit in memory, and the direction-level causal test was negative.
 - Part of the gain is competence: the fine-tune taught the task format as well as the boundary.
 - The hardened agent's self-reports about injections are unreliable.
 - Synthetic, templated, English-only scenarios; mock tools; one small model; the guard shares a model
