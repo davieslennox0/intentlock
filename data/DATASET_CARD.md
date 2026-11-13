@@ -68,7 +68,11 @@ opens a fake system block), `encoded_base64`, `encoded_hex`, `split_across_outpu
 | `heldout_format` (164) | Robustness | Separate phrasing pools, alternate or no boundary tags, plus the unseen location `agent_message` |
 
 No fixture set appears in both train and an evaluation split, and no held-out phrasing template
-appears in train (both checked during curation; see `curation_report.json`).
+appears in train (both checked during curation; see `curation_report.json`). A post-hoc check
+(`scripts/leakage_check.py` in the code repository) confirms that held-out shares no user task or
+injection phrasing with train (closest pair: 0.47 word-3-gram Jaccard). `test` is in-distribution by
+design: 133 of its 179 non-encoded attacks reuse a train phrasing template with different values, and
+27 repeat a train user task word for word.
 
 ## How it was made
 

@@ -20,13 +20,15 @@ trajectories with SafeTune's SafeGrad and train a second Tiny Aya adapter as a p
 that sees only the task, recent tool output and the proposed payload. The hardened agent follows 0
 of 179 test attacks and 2 of 109 held-out ones (1.8%, CI 0.0 to 4.6); with the guard, 0 of 109.
 Refusals of legitimate actions fall from 28.6% to 6.3% on test and from 55.3% to 13.2% on held-out.
-MMLU is unchanged and GSM8K moves by -2 points (AuditKIT slices). The guard alone, on the base
-agent, cuts attack success to 0.6% on test and 3.7% on held-out.
+MMLU is unchanged and GSM8K moves by -2 points (AuditKIT slices). The guard is defence in depth: on
+the base agent it cuts attack success to 0.6% and 3.7%, at 41% and 28% precision, and it adds little
+on top of the hardened agent.
 
-Three caveats. Plain SFT on the same data matches SafeGrad, so the gain comes from the data, not the
-method. The test split shares templates with training, so the small held-out split is the one to
-trust. And in both held-out failures the hardened agent's final message claims it ignored the
-injected instruction.
+Three caveats. Plain SFT on the same data matches SafeGrad, so the gain comes mainly from the data,
+not SafeTune's method. A leakage check found no held-out task or injection phrasing in train, but
+the test split shares templates with it, so the small held-out split is the one to trust. And in
+both held-out failures the hardened agent's final message claims it ignored the injected
+instruction.
 
 Interpretability gave a negative result. CircuitKIT's circuit discovery ran out of memory at the
 agent's context length on a 16 GB GPU and a 31 GB CPU machine. As a fallback we fitted our own

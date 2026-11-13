@@ -292,17 +292,18 @@ How to read this:
   sample is small.
 - **SafeGrad is not what did it.** The plain-SFT ablation, with the same data and settings, is
   statistically indistinguishable on attack success on both splits, and the two training-loss
-  curves are nearly identical. The gain comes from the training data (safe trajectories), not from
-  the gradient-surgery method. SafeGrad ran at batch size 1 with a cross-entropy proxy safety set.
+  curves are nearly identical. The gain comes mainly from the training data (safe trajectories),
+  not from SafeTune's SafeGrad method specifically. SafeGrad ran at batch size 1 with a cross-entropy proxy safety set.
 - **The agent also got better at the job.** Clean-task completion rises from 72.0% to 88.0% on test
   and 44.4% to 84.4% on held-out, and refusals of legitimate actions fall. The fine-tune taught the
   task format as well as the boundary; that part is a competence gain, not a safety result.
-- **The guard alone is nearly as effective as hardening, at no retraining of the agent.** On the
-  base agent it cuts headline attack success from 22.3% to 0.6% on test and from 16.5% to 3.7% on
-  held-out, without changing clean-task completion on test. On held-out, clean refusals rose
-  5.3 points [0.0, +13.2].
-- **The guard on top of the hardened agent adds little that these samples can show:** it caught the
-  hardened agent's two held-out failures (0 of 109 after the guard) and had nothing to catch on test.
+- **The guard is defence in depth, with a cost.** On the base agent its recall is high: headline
+  attack success falls from 22.3% to 0.6% on test and from 16.5% to 3.7% on held-out, with clean-task
+  completion unchanged on test. Its precision is low (41% and 28%, table below), and on held-out
+  clean refusals rose 5.3 points [0.0, +13.2].
+- **The guard on top of the hardened agent adds almost nothing these samples can show:** it caught
+  the hardened agent's two held-out failures (0 of 109 after the guard, inside the interval), had
+  nothing to catch on test, and blocked the expected action in one scenario per split.
 - **The prompt rule does nothing measurable** (-1.1 points [-6.7, +4.5] on test, +0.9 [-5.5, +7.3]
   on held-out).
 
@@ -318,8 +319,9 @@ How to read this:
 Recall on injected actions is 97.9% on test and 82.6% on held-out with the base agent. "Other
 actions blocked" are proposals that were neither the injected action nor the action the task
 expected: mostly the base agent's own mistakes (guessed commands, wrong action type). Counting
-those as false positives gives a precision of 41% on test and 28% on held-out; that figure says
-the guard blocks off-task actions, not that it blocks the user's intended ones. Median guard
+those as false positives gives a precision of 41% on test and 28% on held-out. The guard blocked
+the task's expected action in no scenario with the base agent, but each of those blocks is still an
+action the agent wanted that did not go through, so this is a real cost. Median guard
 latency is 4.4 s per check on a T4 (9.3 tokens/s).
 
 **When attacks succeed.** On the base agent, 32 of 40 test successes and 13 of 18 held-out
@@ -343,6 +345,22 @@ resolve.
 
 **Sampled decoding (test).** Base 19.0% [13.4, 24.6] headline attack success, hardened 0.0%
 (0 of 179).
+
+### Leakage check
+
+`scripts/leakage_check.py` compares train with both evaluation splits (results in
+`reports/leakage_check.json`). No scenario id or complete set of tool outputs is shared with train.
+**Held-out formats are clean:** no user task, injection string or injection phrasing template occurs
+in train, and the closest train scenario has a word-3-gram Jaccard similarity of 0.47 (0.57 with
+addresses, numbers and token names masked); no pair reaches 0.8. **Test is not template-independent,
+by construction:** 133 of its 179 headline attacks use an injection phrasing template that also
+appears in train with different values filled in, 27 repeat a train user task word for word, 2 repeat
+an injection string and 1 pair exceeds 0.9 similarity on raw text (38 scenarios do once values are
+masked). On the 46 test attacks whose phrasing template is absent from train, the base agent follows
+13 (28.3% [15.2, 41.3]) and the hardened agent, the plain-SFT agent and hardened + guard follow 0;
+on the 150 with no word-for-word overlap, base follows 31 (20.7% [14.7, 27.3]) and the others 0. The
+headline tables are unchanged: the test zero is an in-distribution result, and held-out is the
+generalisation check.
 
 ### Interpretability results
 

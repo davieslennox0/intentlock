@@ -334,6 +334,7 @@ footer{padding:34px 0 70px;color:var(--muted);font-size:.875rem;border-top:1px s
   <h2>What this does not show</h2>
   <ul class="plain stagger reveal">
     <li class="card" style="--c:var(--red)"><b class="t">Synthetic test</b><p>The scenarios are templated, in English, with mock tools. Results describe this test, not a motivated human attacker.</p></li>
+    <li class="card" style="--c:var(--green)"><b class="t">Test is in-distribution</b><p>133 of 179 test attacks reuse a training phrasing template with different values. Held-out formats share no task or injection phrasing with training, and are the generalisation check.</p></li>
     <li class="card" style="--c:var(--amber)"><b class="t">No adaptive attacker</b><p>Nobody optimised attacks against the hardened agent or the guard. Someone who did would beat these templates.</p></li>
     <li class="card" style="--c:var(--blue)"><b class="t">One small model</b><p>Tiny Aya has 3.35 billion parameters. Larger agents may behave differently.</p></li>
     <li class="card" style="--c:var(--cyan)"><b class="t">No mechanism found</b><p>Circuit discovery ran out of memory. A fitted direction reads whether an injection is present, but removing it did not cut attack success beyond a random control.</p></li>

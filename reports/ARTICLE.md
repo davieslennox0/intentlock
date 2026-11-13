@@ -87,18 +87,24 @@ on formats the agent never trained on. Refusals of legitimate actions fall too, 
 completion rises from 72% to 88% on test. Capability on fixed slices is unchanged within noise: MMLU
 41.5% before and after, GSM8K 74% to 72% on 100 items.
 
-**The method was not the active ingredient.** Plain SFT with the same data and settings is
-statistically indistinguishable from SafeGrad on attack success, and their loss curves nearly
-coincide. SafeGrad ran at batch size 1 on a 16 GB GPU, which may be far from where it helps. What
-this study supports is that the *data* did the work.
+**The method was not the active ingredient.** Plain SFT with the same data and settings follows 0 of
+179 test attacks and 1 of 109 held-out ones (0.9% [0.0, 2.8]), against 0 and 1.8% [0.0, 4.6] for
+SafeGrad. Clean-task completion is 92.0% and 77.8% for plain SFT against 88.0% and 84.4%; refusals of
+legitimate actions are 1.6% and 23.7% against 6.3% and 13.2%. All of those intervals overlap, and the
+two loss curves nearly coincide. So the gain comes mainly from the training data, the safe
+trajectories, and not from SafeTune's SafeGrad method specifically. SafeGrad ran at batch size 1 on
+a 16 GB GPU, which may be far from where it helps.
 
-**A guard in front of the signer is nearly as good, with no retraining of the agent.** A second Tiny
-Aya adapter sees only the user's task, recent tool output and the proposed payload, and answers ALLOW
-or BLOCK. On the unmodified agent it blocked 47 of 48 injected actions on test and 19 of 23 on
-held-out, and blocked the task's expected action in no scenario. It also blocked 67 and 49 other
-proposals, mostly the base agent's own off-task actions such as guessed commands; counted as false
-positives those give a precision of 41% and 28%, which overstates the cost to the user. A check
-takes a median 4.4 seconds on a T4.
+**The guard is defence in depth, with a cost.** A second Tiny Aya adapter sees only the user's task,
+recent tool output and the proposed payload, and answers ALLOW or BLOCK. Its recall on the unmodified
+agent is high: it blocked 47 of 48 injected actions on test and 19 of 23 on held-out, taking attack
+success to 0.6% and 3.7%. Its precision is low: 41% on test and 28% on held-out, because it also
+blocked 67 and 49 proposals that were not injected actions. Those were mostly the base agent's own
+off-task proposals, and it blocked the task's expected action in no scenario, but every such block is
+an action the agent wanted that did not go through. On top of the hardened agent it adds almost
+nothing these samples can show: nothing to catch on test, and 2 of 109 held-out attacks down to 0,
+inside the interval, while blocking the expected action in one scenario per split. A check takes a
+median 4.4 seconds on a T4.
 
 **When it fails, it fails fast.** 32 of 40 successful test attacks on the base agent happened on the
 first step after it read the poisoned output.
@@ -121,11 +127,27 @@ That last sentence is the most uncomfortable finding here. The fine-tuned agent 
 ignored an injection, and here it says so right after proposing the injected command. In the payment
 case, run with the guard on, its final message claims both that it "Paid 80 USDC" (the guard had
 blocked it) and that it "did not act on" the instruction. An agent's
-account of its own behaviour is not evidence; the action log is. It is also the argument for the
-guard: a check that reads the payload does not depend on what the agent believes it did.
+account of its own behaviour is not evidence; the action log is. That is the case for keeping a
+payload check as a second layer: it does not depend on what the agent believes it did.
 
 With the guard on the base agent, five attacks got through across both splits: three injections in
 API responses, one in token metadata and one payload split across two tool outputs.
+
+## Leakage check
+
+`scripts/leakage_check.py` compares train with both evaluation splits (results in
+`reports/leakage_check.json`). No scenario id or complete set of tool outputs is shared with train.
+**Held-out formats are clean:** no user task, injection string or injection phrasing template occurs
+in train, and the closest train scenario has a word-3-gram Jaccard similarity of 0.47 (0.57 with
+addresses, numbers and token names masked); no pair reaches 0.8. **Test is not template-independent,
+by construction:** 133 of its 179 headline attacks use an injection phrasing template that also
+appears in train with different values filled in, 27 repeat a train user task word for word, 2 repeat
+an injection string and 1 pair exceeds 0.9 similarity on raw text (38 scenarios do once values are
+masked). On the 46 test attacks whose phrasing template is absent from train, the base agent follows
+13 (28.3% [15.2, 41.3]) and the hardened agent, the plain-SFT agent and hardened + guard follow 0;
+on the 150 with no word-for-word overlap, base follows 31 (20.7% [14.7, 27.3]) and the others 0. The
+headline tables are unchanged: the test zero is an in-distribution result, and held-out is the
+generalisation check.
 
 ## Where does injection-following live?
 
@@ -177,6 +199,7 @@ price.
 
 - The test split shares its generator and templates with training. Its zero is in-distribution. The
   held-out split is the only out-of-template check, with 109 attacks.
+- The guard's precision is low (41% and 28%), and it adds little on top of the hardened agent.
 - No adaptive attacker. Someone optimising against the hardened model or the guard would do better.
 - SafeGrad showed no advantage over plain SFT.
 - The prompt rule showed no effect.
