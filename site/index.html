@@ -266,7 +266,7 @@ footer{padding:34px 0 70px;color:var(--muted);font-size:.875rem;border-top:1px s
   </div>
   <div class="chips" id="chips" role="group" aria-label="Scenarios"></div>
   <div class="window"><div class="bar"><u style="background:var(--red)"></u><u style="background:var(--amber)"></u><u style="background:var(--green)"></u><span style="margin-left:8px">what the agent is given</span></div><div class="body" id="scenario"></div></div>
-  <div class="playbar"><button class="btn primary" id="play">▶ Play the episode</button><span class="small muted">Replayed from recorded runs, not generated live.</span></div>
+  <div class="playbar"><button class="btn primary" id="play">▶ Play the episode</button><span class="small muted">Replay of recorded episodes from the final run; no live model.</span></div>
   <div class="cols">
     <div class="window"><div class="bar"><u style="background:var(--red)"></u>Base Tiny Aya</div><div class="body" id="base"></div></div>
     <div class="window"><div class="bar"><u style="background:var(--green)"></u>Hardened agent + pre-signing guard</div><div class="body" id="hard"></div></div>
@@ -316,6 +316,17 @@ footer{padding:34px 0 70px;color:var(--muted);font-size:.875rem;border-top:1px s
     <h2>Before and after, <span class="grad">on seen and unseen formats</span></h2>
   </div>
   <div id="results-body" class="reveal"></div>
+  <div class="reveal" id="interp" style="margin-top:44px">
+    <h3 style="margin:0 0 8px">Where does injection-following live? <span class="muted">A negative result.</span></h3>
+    <p class="small muted" style="max-width:none">CircuitKIT circuit discovery was attempted and ran out of memory on a 16 GB GPU and a 31 GB CPU machine. As a fallback, with our own code, we fitted one residual-stream direction that reads whether an injection is present (89% validation accuracy), then removed it from the base agent. Attack success on 120 scenarios per split, with 95% intervals:</p>
+    <div class="tablewrap"><table><thead><tr><th>Condition</th><th>Test</th><th>Held-out formats</th></tr></thead><tbody>
+      <tr><td>No intervention</td><td>19.2% [12.5, 25.8]</td><td>16.0% [10.1, 22.7]</td></tr>
+      <tr><td>Direction removed</td><td>25.0% [17.5, 33.3]</td><td>8.4% [4.2, 14.3]</td></tr>
+      <tr><td>Steered away from direction</td><td>22.5% [15.0, 30.0]</td><td>9.2% [4.2, 15.1]</td></tr>
+      <tr><td>Random direction removed (control)</td><td>16.7% [10.0, 23.3]</td><td>11.8% [6.7, 17.6]</td></tr>
+    </tbody></table></div>
+    <p class="small muted" style="max-width:none">Removing the direction did not lower attack success on test, and on held-out formats the random control fell too, with overlapping intervals. No mechanism is claimed. Run <code>20261112T2003-interp-c369bcb</code>.</p>
+  </div>
 </div></section>
 
 <section id="limits" class="t-red"><div class="wrap reveal">

@@ -150,7 +150,8 @@ def main():
         api.create_repo(repo, repo_type="space", space_sdk="static", private=False, exist_ok=True)
         readme = ("---\ntitle: Intentlock\nemoji: 🖋️\ncolorFrom: indigo\ncolorTo: green\nsdk: static\n"
                   "app_file: index.html\npinned: false\nlicense: mit\n"
-                  "short_description: Base vs hardened wallet agent on poisoned tool output\n---\n\n"
+                  "short_description: Replay of recorded episodes; no live model\n---\n\n"
+                  "**Replay of recorded episodes from the final run; no live model.**\n\n"
                   "Replay demo for [Intentlock](https://github.com/davieslennox0/intentlock): the same poisoned tool "
                   "output given to base Tiny Aya and to the hardened agent with a pre-signing guard. Episodes are "
                   f"replayed from recorded traces of run `{a.final_run}`; no model runs in this Space. All tools are "

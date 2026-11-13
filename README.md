@@ -65,7 +65,7 @@ Hugging Face namespace: [`Sykeclonex`](https://huggingface.co/Sykeclonex). All r
 | Hardened agent adapter (SafeGrad) | [`Sykeclonex/intentlock-tiny-aya-hardened`](https://huggingface.co/Sykeclonex/intentlock-tiny-aya-hardened) |
 | Plain-SFT ablation adapter | [`Sykeclonex/intentlock-tiny-aya-plain-sft`](https://huggingface.co/Sykeclonex/intentlock-tiny-aya-plain-sft) |
 | Guard adapter | [`Sykeclonex/intentlock-tiny-aya-guard`](https://huggingface.co/Sykeclonex/intentlock-tiny-aya-guard) |
-| Demo Space (replays recorded traces) | [`Sykeclonex/intentlock`](https://huggingface.co/spaces/Sykeclonex/intentlock) |
+| Demo Space (replay of recorded episodes from the final run; no live model) | [`Sykeclonex/intentlock`](https://huggingface.co/spaces/Sykeclonex/intentlock) |
 | Project page | <https://pitchook.xyz> |
 
 The Space is static: it replays recorded episodes and runs no model, because a Gradio Space needs a
@@ -353,7 +353,8 @@ which is at least 1,023 tokens with the full system prompt. It ran out of memory
 Kaggle's 31 GB CPU machine, including with a condensed system prompt (about 700 tokens), 8 examples
 and half precision. There is no circuit to report.
 
-**The injection is readable.** As a fallback we fitted a single residual-stream direction on train:
+**The injection is readable.** As a fallback, with our own code and not CircuitKIT, we fitted a single
+residual-stream direction on train:
 the mean activation at the decision point with the injection present, minus the same context with
 the injection replaced by filler. Projecting onto it separates the two cases with 89% validation
 accuracy at layer 6 of 36. On unseen scenarios the same probe flags an active injection with 64%
@@ -453,9 +454,23 @@ reports/    result tables, plots, abstract, article draft
 - **Problem statements:** #2 adversarial eval sets, #3 multi-turn audits, #5 safety-preserving
   fine-tuning, #9 locating where safety lives
 - **Core model:** `CohereLabs/tiny-aya-global` (the only model used anywhere in the pipeline)
-- **Lexsi libraries:** CuratorKIT 0.1.21, AuditKIT 1.1.6, SafeTune 0.1.12, CircuitKIT 0.2.1
+- **Lexsi libraries:** see the table below
 - **Other data:** BeaverTails (SafeGrad alignment set, loaded by SafeTune), MMLU and GSM8K slices
   (capability check, loaded by AuditKIT)
+
+### Lexsi libraries in the final pipeline
+
+| Lexsi library | Status in the final pipeline | What it did |
+|---|---|---|
+| CuratorKIT 0.1.21 | Ran | Filtered and de-duplicated the generated scenarios and wrote the dataset manifest, provenance and checksums |
+| AuditKIT 1.1.6 | Ran | Scored every configuration's recorded traces with its agent-eval layer (security and utility assertions) and ran the MMLU and GSM8K capability slices |
+| SafeTune 0.1.12 | Ran | Trained the hardened adapter with SafeGrad; its LoRA and tokenisation utilities also trained the plain-SFT ablation and the guard |
+| CircuitKIT 0.2.1 | Attempted, did not complete | Circuit discovery (EAP) ran out of memory on a 16 GB GPU and on a 31 GB CPU machine; it produced no result |
+
+The attack-success, completion and refusal figures are computed by this project's own metrics code
+from the action log; AuditKIT scores the same traces independently. The direction probe and the
+causal test in the interpretability section are this project's own fallback implementation
+(`interp/direction.py`, `interp/causal_eval.py`), not CircuitKIT output.
 
 ## Licence
 

@@ -40,8 +40,20 @@ not LLM-paraphrased. Outcomes are labelled from the action log; there is no LLM 
 ## Pipeline
 
 CuratorKIT (dataset) → AuditKIT (baseline audit, capability slices) → SafeTune (hardening) and a
-pre-signing guard → CircuitKIT (mechanism) → AuditKIT again. The core model throughout is Cohere's
+pre-signing guard → CircuitKIT (attempted) → AuditKIT again. The core model throughout is Cohere's
 Tiny Aya (3.35B), with QLoRA adapters trained on Kaggle T4s.
+
+| Lexsi library | Status in the final pipeline | What it did |
+|---|---|---|
+| CuratorKIT 0.1.21 | Ran | Filtered and de-duplicated the generated scenarios and wrote the dataset manifest, provenance and checksums |
+| AuditKIT 1.1.6 | Ran | Scored every configuration's recorded traces with its agent-eval layer (security and utility assertions) and ran the MMLU and GSM8K capability slices |
+| SafeTune 0.1.12 | Ran | Trained the hardened adapter with SafeGrad; its LoRA and tokenisation utilities also trained the plain-SFT ablation and the guard |
+| CircuitKIT 0.2.1 | Attempted, did not complete | Circuit discovery (EAP) ran out of memory on a 16 GB GPU and on a 31 GB CPU machine; it produced no result |
+
+The attack-success, completion and refusal figures are computed by this project's own metrics code
+from the action log; AuditKIT scores the same traces independently. The direction probe and the
+causal test in the interpretability section are this project's own fallback implementation
+(`interp/direction.py`, `interp/causal_eval.py`), not CircuitKIT output.
 
 ## Metrics and why
 
@@ -124,7 +136,8 @@ which is at least 1,023 tokens with the full system prompt. It ran out of memory
 Kaggle's 31 GB CPU machine, including with a condensed system prompt (about 700 tokens), 8 examples
 and half precision. There is no circuit to report.
 
-**The injection is readable.** As a fallback we fitted a single residual-stream direction on train:
+**The injection is readable.** As a fallback, with our own code and not CircuitKIT, we fitted a single
+residual-stream direction on train:
 the mean activation at the decision point with the injection present, minus the same context with
 the injection replaced by filler. Projecting onto it separates the two cases with 89% validation
 accuracy at layer 6 of 36. On unseen scenarios the same probe flags an active injection with 64%
